@@ -96,7 +96,7 @@ function init() {
     resize();
     view.x = window.innerWidth / 2;
     view.y = window.innerHeight / 2;
-    createColorButtons(); // 初回ボタン生成
+    createColorButtons();
     render();
 }
 
@@ -131,25 +131,25 @@ function render() {
     ctx.scale(view.scale, view.scale);
     ctx.translate(-A3_W / 2, -A3_H / 2);
 
+    // A3クリップ
     ctx.beginPath();
     ctx.rect(0, 0, A3_W, A3_H);
     ctx.clip();
 
+    // 紙
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, A3_W, A3_H);
     
-    if (mapImage.complete && mapImage.src) {
-        const imgRatio = mapImage.width / mapImage.height;
-        const canvasRatio = A3_W / A3_H;
-        let sx, sy, sWidth, sHeight;
-        if (imgRatio > canvasRatio) {
-            sWidth = mapImage.height * canvasRatio; sHeight = mapImage.height;
-            sx = (mapImage.width - sWidth) / 2; sy = 0;
-        } else {
-            sWidth = mapImage.width; sHeight = mapImage.width / canvasRatio;
-            sx = 0; sy = (mapImage.height - sHeight) / 2;
-        }
-        ctx.drawImage(mapImage, sx, sy, sWidth, sHeight, 0, 0, A3_W, A3_H);
+    // 地図描画ロジックの改善
+    if (mapImage && mapImage.complete && mapImage.naturalWidth > 0) {
+        const imgW = mapImage.naturalWidth;
+        const imgH = mapImage.naturalHeight;
+        const scale = Math.min(A3_W / imgW, A3_H / imgH);
+        const dw = imgW * scale;
+        const dh = imgH * scale;
+        const dx = (A3_W - dw) / 2;
+        const dy = (A3_H - dh) / 2;
+        ctx.drawImage(mapImage, dx, dy, dw, dh);
     }
 
     const drawPath = (path) => {
@@ -165,9 +165,43 @@ function render() {
     allPaths.forEach(drawPath);
     if (currentPath) drawPath(currentPath);
     ctx.restore();
+
+    // 枠線
+    ctx.save();
+    ctx.translate(view.x, view.y);
+    ctx.scale(view.scale, view.scale);
+    ctx.translate(-A3_W / 2, -A3_H / 2);
+    ctx.strokeStyle = "rgba(0,0,0,0.15)";
+    ctx.lineWidth = 1 / view.scale;
+    ctx.strokeRect(0, 0, A3_W, A3_H);
+    ctx.restore();
 }
 
-// 操作イベント
+// 画像入力の強化
+document.getElementById('mapInput').onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = f => {
+        const tempImg = new Image();
+        tempImg.onload = () => {
+            mapImage = tempImg;
+            resetView();
+        };
+        tempImg.src = f.target.result;
+    };
+    reader.readAsDataURL(file);
+};
+
+function resetView() {
+    const padding = 60;
+    view.scale = Math.min((window.innerWidth - padding) / A3_W, (window.innerHeight - padding) / A3_H);
+    view.x = window.innerWidth / 2;
+    view.y = window.innerHeight / 2;
+    render();
+}
+
+// ポインター操作
 canvas.addEventListener('pointerdown', e => {
     lastPointers.push(e);
     if (lastPointers.length > 1 || e.buttons === 2) {
@@ -212,14 +246,6 @@ window.addEventListener('pointerup', e => {
     render();
 });
 
-function resetView() {
-    const padding = 40;
-    view.scale = Math.min((window.innerWidth-padding) / A3_W, (window.innerHeight-padding) / A3_H) * 0.9;
-    view.x = window.innerWidth / 2;
-    view.y = window.innerHeight / 2;
-    render();
-}
-
 function exportDXF() {
     let dxfContent = "0\nSECTION\n2\nENTITIES\n";
     const colorMap = { 'red': 1, 'blue': 5, 'purple': 6, 'green': 3, 'orange': 40, 'black': 7 };
@@ -240,21 +266,24 @@ function exportDXF() {
     link.click();
 }
 
-// 保存・読込
 function exportProjectJSON() {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([JSON.stringify({map: mapImage.src, paths: allPaths})], {type: 'application/json'}));
     a.download = `Survey_${Date.now()}.json`; a.click();
 }
+
 function importProjectJSON(input) {
     const reader = new FileReader();
     reader.onload = e => {
         const data = JSON.parse(e.target.result);
         allPaths = data.paths || [];
-        mapImage = new Image(); mapImage.onload = () => resetView(); mapImage.src = data.map;
+        const tempImg = new Image();
+        tempImg.onload = () => { mapImage = tempImg; resetView(); };
+        tempImg.src = data.map || "";
     };
     reader.readAsText(input.files[0]);
 }
+
 function exportPDF() {
     const oldView = {...view};
     view.scale = Math.min(window.innerWidth / A3_W, window.innerHeight / A3_H);
@@ -263,7 +292,6 @@ function exportPDF() {
     setTimeout(() => { window.print(); view = oldView; render(); }, 300);
 }
 
-// --- カラーボタン生成 ---
 const colors = ['red', 'blue', 'purple', 'green', 'orange', 'black'];
 function createColorButtons() {
     const cp = document.getElementById('colorPicker');
@@ -272,14 +300,8 @@ function createColorButtons() {
         const b = document.createElement('button');
         b.className = 'color-btn';
         b.style.backgroundColor = c;
-        // 現在の色かつペンモードの時にクラスを付与
-        if (c === currentColor && mode === 'draw') {
-            b.classList.add('selected');
-        }
-        b.onclick = () => { 
-            currentColor = c; 
-            setMode('draw'); 
-        };
+        if (c === currentColor && mode === 'draw') b.classList.add('selected');
+        b.onclick = () => { currentColor = c; setMode('draw'); };
         cp.appendChild(b);
     });
 }
@@ -288,7 +310,7 @@ function setMode(m) {
     mode = m;
     document.getElementById('btn-draw').classList.toggle('active', m === 'draw');
     document.getElementById('btn-erase').classList.toggle('active', m === 'erase');
-    createColorButtons(); // モード切替時に色ボタンの状態を更新
+    createColorButtons();
 }
 
 function undo() { allPaths.pop(); render(); }
