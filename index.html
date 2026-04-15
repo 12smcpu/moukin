@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>猛禽類調査デジタル野帳 Pro</title>
+    <style>
+        :root { 
+            --bg-color: #34495e; 
+            --ui-bg: rgba(255, 255, 255, 0.95);
+            --accent: #3498db;
+        }
+        body { margin: 0; overflow: hidden; background: var(--bg-color); font-family: sans-serif; }
+        
+        #toolbar { 
+            position: fixed; top: 10px; left: 10px; z-index: 1000;
+            background: var(--ui-bg); padding: 12px; border-radius: 12px;
+            display: flex; flex-direction: column; gap: 8px; 
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+            width: 200px; max-height: 90vh; overflow-y: auto;
+        }
+        
+        .section-title { font-size: 10px; font-weight: bold; color: #2c3e50; border-left: 3px solid var(--accent); padding-left: 6px; }
+        .btn-group { display: flex; flex-wrap: wrap; gap: 4px; }
+        
+        button { 
+            padding: 8px; cursor: pointer; border: 1px solid #ddd; 
+            background: #fff; border-radius: 6px; font-size: 11px; flex: 1;
+        }
+        button.active { background: var(--accent); color: white; border-color: var(--accent); }
+        .color-btn { width: 28px; height: 28px; border-radius: 50%; border: 2px solid #fff; flex: none; }
+        
+        #viewport { width: 100vw; height: 100vh; display: block; touch-action: none; }
+
+        @media print {
+            @page { size: A3 landscape; margin: 0; }
+            #toolbar { display: none !important; }
+            body { background: white; }
+            canvas { width: 100% !important; height: auto !important; object-fit: contain; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="toolbar">
+    <div class="section-title">PROJECT</div>
+    <div class="btn-group">
+        <button onclick="exportProjectJSON()">保存</button>
+        <button onclick="document.getElementById('importFile').click()">開く</button>
+        <input type="file" id="importFile" accept=".json" style="display:none" onchange="importProjectJSON(this)">
+    </div>
+
+    <div class="section-title">MAP (A3)</div>
+    <input type="file" id="mapInput" accept="image/*" style="font-size: 9px; width: 100%;">
+    <button onclick="resetView()">全体表示</button>
+
+    <div class="section-title">TOOLS</div>
+    <div class="btn-group">
+        <button id="btn-draw" class="active" onclick="setMode('draw')">ペン</button>
+        <button id="btn-erase" onclick="setMode('erase')">消しゴム</button>
+        <button onclick="undo()">Undo</button>
+    </div>
+
+    <div class="btn-group" id="colorPicker"></div>
+
+    <div class="section-title">EXPORT</div>
+    <div class="btn-group">
+        <button onclick="exportDXF()">DXF</button>
+        <button onclick="exportPDF()" style="border-color: var(--accent); color: var(--accent);">PDF出力</button>
+    </div>
+</div>
+
+<canvas id="viewport"></canvas>
+
+<script>
+const A3_W = 1587, A3_H = 1123;
+const canvas = document.getElementById('viewport');
+const ctx = canvas.getContext('2d');
+
+let mapImage = new Image();
+let allPaths = [], currentPath = null;
+let mode = 'draw', currentColor = 'red';
+let view = { x: 0, y: 0, scale: 0.4 };
+let isPanning = false, lastPointers = [];
+
+function init() {
+    window.addEventListener('resize', resize);
+    resize();
+    view.x = window.innerWidth / 2;
+    view.y = window.innerHeight / 2;
+    render();
+}
+
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    render();
+}
+
+function toCanvas(sx, sy) {
+    return { x: (sx - view.x) / view.scale + A3_W / 2, y: (sy - view.y) / view.scale + A3_H / 2 };
+}
+
+function render() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.save();
+    ctx.translate(view.x, view.y);
+    ctx.scale(view.scale, view.scale);
+    ctx.translate(-A3_W / 2, -A3_H / 2);
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, A3_W, A3_H); // A3ベース
+    
+    if (mapImage.complete && mapImage.src) ctx.drawImage(mapImage, 0, 0, A3_W, A3_H);
+
+    [...allPaths, ...(currentPath ? [currentPath] : [])].forEach(path => {
+        if (path.points.length < 2) return;
+        ctx.beginPath();
+        ctx.strokeStyle = path.color;
+        ctx.lineWidth = 3 / view.scale;
+        ctx.lineCap = ctx.lineJoin = "round";
+        ctx.moveTo(path.points[0].x, path.points[0].y);
+        path.points.forEach(pt => ctx.lineTo(pt.x, pt.y));
+        ctx.stroke();
+    });
+    ctx.restore();
+}
+
+// iPhone用マルチタッチ & マウス対応イベント
+canvas.addEventListener('pointerdown', (e) => {
+    lastPointers.push(e);
+    if (lastPointers.length > 1 || e.buttons === 2) {
+        isPanning = true;
+    } else if (e.buttons === 1 && !isPanning) {
+        const pt = toCanvas(e.clientX, e.clientY);
+        if (mode === 'draw') currentPath = { points: [pt], color: currentColor };
+        else allPaths = allPaths.filter(p => !p.points.some(ppp => Math.hypot(ppp.x-pt.x, ppp.y-pt.y) < 20/view.scale));
+    }
+});
+
+window.addEventListener('pointermove', (e) => {
+    const idx = lastPointers.findIndex(p => p.pointerId === e.pointerId);
+    if (idx !== -1) {
+        const prev = lastPointers[idx];
+        if (isPanning) {
+            if (lastPointers.length === 2) { // ピンチズーム
+                const other = lastPointers[idx === 0 ? 1 : 0];
+                const oldDist = Math.hypot(prev.clientX - other.clientX, prev.clientY - other.clientY);
+                const newDist = Math.hypot(e.clientX - other.clientX, e.clientY - other.clientY);
+                const zoom = newDist / oldDist;
+                view.scale *= zoom;
+            }
+            view.x += e.clientX - prev.clientX;
+            view.y += e.clientY - prev.clientY;
+            render();
+        } else if (currentPath) {
+            currentPath.points.push(toCanvas(e.clientX, e.clientY));
+            render();
+        }
+        lastPointers[idx] = e;
+    }
+});
+
+window.addEventListener('pointerup', (e) => {
+    lastPointers = lastPointers.filter(p => p.pointerId !== e.pointerId);
+    if (lastPointers.length === 0) {
+        if (currentPath) { allPaths.push(currentPath); currentPath = null; }
+        isPanning = false;
+    }
+    render();
+});
+
+canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    const factor = Math.pow(0.999, e.deltaY);
+    view.x = e.clientX - (e.clientX - view.x) * factor;
+    view.y = e.clientY - (e.clientY - view.y) * factor;
+    view.scale *= factor;
+    render();
+}, { passive: false });
+
+function exportPDF() {
+    const oldView = {...view};
+    const scale = Math.min(canvas.width / A3_W, canvas.height / A3_H);
+    view = { x: canvas.width/2, y: canvas.height/2, scale: scale };
+    render();
+    setTimeout(() => { window.print(); view = oldView; render(); }, 300);
+}
+
+// JSON / DXF / UI 関連 (中略)
+document.getElementById('mapInput').onchange = e => {
+    const reader = new FileReader();
+    reader.onload = f => { mapImage = new Image(); mapImage.onload = () => { resetView(); render(); }; mapImage.src = f.target.result; };
+    reader.readAsDataURL(e.target.files[0]);
+};
+
+function exportProjectJSON() {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify({map: mapImage.src, paths: allPaths})], {type: 'application/json'}));
+    a.download = `Survey_${Date.now()}.json`; a.click();
+}
+
+function importProjectJSON(input) {
+    const reader = new FileReader();
+    reader.onload = e => {
+        const data = JSON.parse(e.target.result);
+        allPaths = data.paths || [];
+        mapImage = new Image(); mapImage.onload = () => { resetView(); render(); }; mapImage.src = data.map;
+    };
+    reader.readAsText(input.files[0]);
+}
+
+const colors = ['red', 'blue', 'purple', 'green', 'orange', 'black'];
+const cp = document.getElementById('colorPicker');
+colors.forEach(c => {
+    const b = document.createElement('button'); b.className = 'color-btn'; b.style.background = c;
+    b.onclick = () => { currentColor = c; setMode('draw'); }; cp.appendChild(b);
+});
+
+function setMode(m) {
+    mode = m;
+    document.getElementById('btn-draw').className = m==='draw'?'active':'';
+    document.getElementById('btn-erase').className = m==='erase'?'active':'';
+}
+function undo() { allPaths.pop(); render(); }
+function resetView() { view = { x: canvas.width/2, y: canvas.height/2, scale: (canvas.width/A3_W)*0.8 }; render(); }
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+function exportDXF() {
+    let dxf = "0\nSECTION\n2\nENTITIES\n";
+    allPaths.forEach(path => {
+        dxf += "0\nPOLYLINE\n8\nFlightPath\n62\n" + (path.color === 'red' ? 1 : 7) + "\n66\n1\n";
+        path.points.forEach(pt => { dxf += `0\nVERTEX\n10\n${pt.x.toFixed(2)}\n20\n${-pt.y.toFixed(2)}\n`; });
+        dxf += "0\nSEQEND\n";
+    });
+    dxf += "0\nENDSEC\n0\nEOF";
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([dxf], {type: 'application/dxf'}));
+    a.download = "SurveyLines.dxf"; a.click();
+}
+
+init();
+</script>
+</body>
+</html>
