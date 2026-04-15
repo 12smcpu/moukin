@@ -3,10 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>猛禽類調査 Pro - Visual Fix</title>
+    <title>猛禽類調査 Pro - High Visibility</title>
     <style>
         :root { 
-            /* あなたが希望する明るいグレー */
             --bg-color: #dadce3; 
             --ui-bg: rgba(255, 255, 255, 0.95); 
             --accent: #3498db; 
@@ -26,8 +25,23 @@
         .btn-group { display: flex; flex-wrap: wrap; gap: 4px; }
         button { padding: 8px; cursor: pointer; border: 1px solid #ddd; background: #fff; border-radius: 6px; font-size: 11px; flex: 1; }
         button.active { background: var(--accent); color: white; border-color: var(--accent); }
-        .color-btn { width: 28px; height: 28px; border-radius: 50%; border: 2px solid #fff; flex: none; }
         
+        /* 色ボタンの基本スタイル */
+        .color-btn { 
+            width: 32px; height: 32px; border-radius: 50%; 
+            border: 2px solid transparent; flex: none; 
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+            box-sizing: border-box; 
+            cursor: pointer;
+        }
+        /* 選択中の色ボタン：白い外枠と強い影 */
+        .color-btn.selected {
+            border: 3px solid #fff !important;
+            box-shadow: 0 0 0 2px var(--accent), 0 4px 10px rgba(0,0,0,0.3);
+            transform: scale(1.2);
+            z-index: 2;
+        }
+
         #viewport { width: 100vw; height: 100vh; display: block; touch-action: none; background: transparent; }
 
         @media print {
@@ -82,56 +96,48 @@ function init() {
     resize();
     view.x = window.innerWidth / 2;
     view.y = window.innerHeight / 2;
+    createColorButtons(); // 初回ボタン生成
     render();
 }
 
 function resize() {
     const dpr = window.devicePixelRatio || 1;
-    // 画面全体をカバーする論理ピクセル
     canvas.width = window.innerWidth * dpr;
     canvas.height = window.innerHeight * dpr;
     canvas.style.width = window.innerWidth + 'px';
     canvas.style.height = window.innerHeight + 'px';
-    // DPRに合わせてスケールを初期化
     ctx.scale(dpr, dpr);
     render();
 }
 
 function toCanvas(sx, sy) {
     const rect = canvas.getBoundingClientRect();
-    const x = sx - rect.left;
-    const y = sy - rect.top;
     return { 
-        x: (x - view.x) / view.scale + A3_W / 2, 
-        y: (y - view.y) / view.scale + A3_H / 2 
+        x: (sx - rect.left - view.x) / view.scale + A3_W / 2, 
+        y: (sy - rect.top - view.y) / view.scale + A3_H / 2 
     };
 }
 
 function render() {
     const dpr = window.devicePixelRatio || 1;
     ctx.save();
-    // 1. 座標系をリセットして画面全体をご指定のグレーで塗りつぶす (残像を消す)
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = "#dadce3"; 
     ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
     ctx.restore();
 
     ctx.save();
-    // 2. 調査データの座標系（パン・ズーム）を適用
     ctx.translate(view.x, view.y);
     ctx.scale(view.scale, view.scale);
     ctx.translate(-A3_W / 2, -A3_H / 2);
 
-    // 3. A3の白い紙の範囲のみを描画対象にする
     ctx.beginPath();
     ctx.rect(0, 0, A3_W, A3_H);
-    ctx.clip(); // これより外は描画されない
+    ctx.clip();
 
-    // 4. キャンバス背景(紙)
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, A3_W, A3_H);
     
-    // 5. 地図描画（トリミング計算）
     if (mapImage.complete && mapImage.src) {
         const imgRatio = mapImage.width / mapImage.height;
         const canvasRatio = A3_W / A3_H;
@@ -146,9 +152,8 @@ function render() {
         ctx.drawImage(mapImage, sx, sy, sWidth, sHeight, 0, 0, A3_W, A3_H);
     }
 
-    // 6. 線描画
     const drawPath = (path) => {
-        if (!path || path.points.length < 2) return;
+        if (!path || !path.points || path.points.length < 2) return;
         ctx.beginPath();
         ctx.strokeStyle = path.color;
         ctx.lineWidth = 3 / view.scale;
@@ -159,22 +164,10 @@ function render() {
     };
     allPaths.forEach(drawPath);
     if (currentPath) drawPath(currentPath);
-
-    // 7. クリップ解除
-    ctx.restore();
-    
-    // 8. ガイド用の紙の境界線
-    ctx.save();
-    ctx.translate(view.x, view.y);
-    ctx.scale(view.scale, view.scale);
-    ctx.translate(-A3_W / 2, -A3_H / 2);
-    ctx.strokeStyle = "rgba(0,0,0,0.15)";
-    ctx.lineWidth = 1 / view.scale;
-    ctx.strokeRect(0, 0, A3_W, A3_H);
     ctx.restore();
 }
 
-//操作イベント（継承）
+// 操作イベント
 canvas.addEventListener('pointerdown', e => {
     lastPointers.push(e);
     if (lastPointers.length > 1 || e.buttons === 2) {
@@ -206,7 +199,7 @@ window.addEventListener('pointermove', e => {
             currentPath.points.push(toCanvas(e.clientX, e.clientY));
         }
         lastPointers[idx] = e;
-        render(); // 再描画
+        render();
     }
 });
 
@@ -219,7 +212,6 @@ window.addEventListener('pointerup', e => {
     render();
 });
 
-// ファイル入出力など（継承）
 function resetView() {
     const padding = 40;
     view.scale = Math.min((window.innerWidth-padding) / A3_W, (window.innerHeight-padding) / A3_H) * 0.9;
@@ -228,18 +220,32 @@ function resetView() {
     render();
 }
 
-document.getElementById('mapInput').onchange = e => {
-    const reader = new FileReader();
-    reader.onload = f => { mapImage = new Image(); mapImage.onload = () => resetView(); mapImage.src = f.target.result; };
-    reader.readAsDataURL(e.target.files[0]);
-};
+function exportDXF() {
+    let dxfContent = "0\nSECTION\n2\nENTITIES\n";
+    const colorMap = { 'red': 1, 'blue': 5, 'purple': 6, 'green': 3, 'orange': 40, 'black': 7 };
+    allPaths.forEach(path => {
+        if (!path.points || path.points.length < 2) return;
+        const dxfColor = colorMap[path.color] || 7;
+        dxfContent += `0\nPOLYLINE\n8\nFlightPath\n62\n${dxfColor}\n66\n1\n`;
+        path.points.forEach(pt => {
+            dxfContent += `0\nVERTEX\n8\nFlightPath\n10\n${pt.x}\n20\n${-pt.y}\n`;
+        });
+        dxfContent += "0\nSEQEND\n";
+    });
+    dxfContent += "0\nENDSEC\n0\nEOF";
+    const blob = new Blob([dxfContent], {type: 'application/dxf'});
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `SurveyLines_${Date.now()}.dxf`;
+    link.click();
+}
 
+// 保存・読込
 function exportProjectJSON() {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([JSON.stringify({map: mapImage.src, paths: allPaths})], {type: 'application/json'}));
     a.download = `Survey_${Date.now()}.json`; a.click();
 }
-
 function importProjectJSON(input) {
     const reader = new FileReader();
     reader.onload = e => {
@@ -249,52 +255,43 @@ function importProjectJSON(input) {
     };
     reader.readAsText(input.files[0]);
 }
-
 function exportPDF() {
     const oldView = {...view};
-    const scale = Math.min(window.innerWidth / A3_W, window.innerHeight / A3_H);
-    view.scale = scale;
-    view.x = window.innerWidth / 2;
-    view.y = window.innerHeight / 2;
+    view.scale = Math.min(window.innerWidth / A3_W, window.innerHeight / A3_H);
+    view.x = window.innerWidth / 2; view.y = window.innerHeight / 2;
     render();
     setTimeout(() => { window.print(); view = oldView; render(); }, 300);
 }
 
-function exportDXF() {
-    let dxfContent = "0\nSECTION\n2\nENTITIES\n";
-    
-    allPaths.forEach(path => {
-        dxfContent += "0\nPOLYLINE\n8\nFlightPath\n66\n1\n";
-        path.forEach(pt => {
-            // Y軸はCADでは上方向が正のため反転させる
-            dxfContent += `0\nVERTEX\n8\nFlightPath\n10\n${pt.x}\n20\n${-pt.y}\n`;
-        });
-        dxfContent += "0\nSEQEND\n";
-    });
-    
-    dxfContent += "0\nENDSEC\n0\nEOF";
-
-    const blob = new Blob([dxfContent], {type: 'application/dxf'});
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = "flight_path.dxf";
-    link.click();
-}
-
+// --- カラーボタン生成 ---
 const colors = ['red', 'blue', 'purple', 'green', 'orange', 'black'];
-const cp = document.getElementById('colorPicker');
-colors.forEach(c => {
-    const b = document.createElement('button'); b.className = 'color-btn'; b.style.background = c;
-    b.onclick = () => { currentColor = c; setMode('draw'); }; cp.appendChild(b);
-});
+function createColorButtons() {
+    const cp = document.getElementById('colorPicker');
+    cp.innerHTML = '';
+    colors.forEach(c => {
+        const b = document.createElement('button');
+        b.className = 'color-btn';
+        b.style.backgroundColor = c;
+        // 現在の色かつペンモードの時にクラスを付与
+        if (c === currentColor && mode === 'draw') {
+            b.classList.add('selected');
+        }
+        b.onclick = () => { 
+            currentColor = c; 
+            setMode('draw'); 
+        };
+        cp.appendChild(b);
+    });
+}
 
 function setMode(m) {
     mode = m;
-    document.getElementById('btn-draw').className = m==='draw'?'active':'';
-    document.getElementById('btn-erase').className = m==='erase'?'active':'';
+    document.getElementById('btn-draw').classList.toggle('active', m === 'draw');
+    document.getElementById('btn-erase').classList.toggle('active', m === 'erase');
+    createColorButtons(); // モード切替時に色ボタンの状態を更新
 }
+
 function undo() { allPaths.pop(); render(); }
-canvas.addEventListener('contextmenu', e => e.preventDefault());
 canvas.addEventListener('wheel', e => {
     e.preventDefault();
     const factor = Math.pow(0.999, e.deltaY);
@@ -303,6 +300,7 @@ canvas.addEventListener('wheel', e => {
     view.scale *= factor;
     render();
 }, { passive: false });
+
 init();
 </script>
 </body>
