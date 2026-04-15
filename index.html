@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>猛禽類調査 Pro - Final Fix</title>
+    <title>猛禽類調査 Pro - Final Touch</title>
     <style>
         :root { --accent: #3498db; }
         body { margin: 0; overflow: hidden; background: #dadce3; font-family: sans-serif; position: fixed; width: 100%; height: 100%; touch-action: none; }
         #toolbar { 
             position: fixed; top: 10px; left: 10px; z-index: 1000; background: rgba(255,255,255,0.95); 
-            padding: 10px; border-radius: 12px; display: flex; flex-direction: column; gap: 8px; 
+            padding: 10px; border-radius: 12px; display: flex; flex-direction: column; gap: 6px; 
             box-shadow: 0 4px 15px rgba(0,0,0,0.15); width: 180px;
         }
         .section-title { font-size: 10px; font-weight: bold; border-left: 3px solid var(--accent); padding-left: 5px; margin-top: 5px; }
@@ -18,7 +18,6 @@
         button.active { background: var(--accent); color: white; border-color: var(--accent); }
         .color-btn { width: 30px; height: 30px; border-radius: 50%; border: 2px solid transparent; flex: none; cursor: pointer; }
         .color-btn.selected { border: 2px solid #fff; box-shadow: 0 0 0 2px var(--accent); transform: scale(1.1); }
-        canvas { display: block; }
     </style>
 </head>
 <body>
@@ -56,11 +55,15 @@
 
 <script>
 const A3_W = 1587, A3_H = 1123;
+// ★ここで太さを調整できます
+const BASE_LINE_WIDTH = 3.0; 
+const BASE_STAMP_RADIUS = 12.0;
+
 const canvas = document.getElementById('viewport');
 const ctx = canvas.getContext('2d');
 let mapImage = new Image(), allPaths = [], currentPath = null;
 let mode = 'draw', currentColor = 'red', view = { x: 0, y: 0, scale: 0.5 };
-let pointers = {}; // 全てのタッチポイントをIDで管理
+let pointers = {};
 
 function init() {
     window.addEventListener('resize', resize); resize();
@@ -75,15 +78,6 @@ function resize() {
     render();
 }
 
-// 共通変換：地図上の座標(0-1587)を画面上のピクセル位置に
-function getScreenPos(mx, my) {
-    return {
-        x: (mx - A3_W / 2) * view.scale + view.x,
-        y: (my - A3_H / 2) * view.scale + view.y
-    };
-}
-
-// 共通変換：画面上のピクセル位置を地図上の座標(0-1587)に
 function getMapPos(sx, sy) {
     return {
         mx: (sx - view.x) / view.scale + A3_W / 2,
@@ -93,62 +87,62 @@ function getMapPos(sx, sy) {
 
 function render() {
     const dpr = window.devicePixelRatio || 1;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // 基準リセット
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = "#dadce3"; ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
 
-    // 1. 地図レイヤーの描画
     ctx.save();
     ctx.translate(view.x, view.y);
     ctx.scale(view.scale, view.scale);
     ctx.translate(-A3_W/2, -A3_H/2);
+
+    // 地図と紙
     ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, A3_W, A3_H);
     if (mapImage.complete && mapImage.naturalWidth > 0) {
         const s = Math.min(A3_W/mapImage.naturalWidth, A3_H/mapImage.naturalHeight);
         ctx.drawImage(mapImage, (A3_W-mapImage.naturalWidth*s)/2, (A3_H-mapImage.naturalHeight*s)/2, mapImage.naturalWidth*s, mapImage.naturalHeight*s);
     }
-    ctx.restore();
 
-    // 2. ペン・スタンプレイヤーの描画（画面ピクセル基準＝太さ固定）
+    // アイテム描画（Map Spaceで描画しつつ太さを逆算）
     const drawItem = (item) => {
         if (!item) return;
         ctx.strokeStyle = ctx.fillStyle = item.color;
-        ctx.lineWidth = 3; // ★太さを「3ピクセル」に完全固定
         ctx.lineCap = ctx.lineJoin = "round";
+        
+        // ★ここが太さ固定の魔法の計算式
+        // 地図が拡大されても、画面上では BASE_LINE_WIDTH ピクセルに見えるように逆算
+        ctx.lineWidth = BASE_LINE_WIDTH / view.scale; 
 
         if (item.type && item.type.startsWith('stamp')) {
-            const pos = getScreenPos(item.mx, item.my);
-            ctx.beginPath(); ctx.arc(pos.x, pos.y, 12, 0, Math.PI*2); // ★半径も固定
+            const r = BASE_STAMP_RADIUS / view.scale;
+            ctx.beginPath(); ctx.arc(item.mx, item.my, r, 0, Math.PI*2);
             item.type === 'stamp-dot' ? ctx.fill() : ctx.stroke();
             if (item.type === 'stamp-double') {
-                ctx.beginPath(); ctx.arc(pos.x, pos.y, 7, 0, Math.PI*2); ctx.stroke();
+                ctx.beginPath(); ctx.arc(item.mx, item.my, r*0.6, 0, Math.PI*2); ctx.stroke();
             }
         } else if (item.points && item.points.length > 0) {
             ctx.beginPath();
-            const start = getScreenPos(item.points[0].mx, item.points[0].my);
-            ctx.moveTo(start.x, start.y);
-            for(let i=1; i<item.points.length; i++){
-                const p = getScreenPos(item.points[i].mx, item.points[i].my);
-                ctx.lineTo(p.x, p.y);
-            }
+            ctx.moveTo(item.points[0].mx, item.points[0].my);
+            item.points.forEach(p => ctx.lineTo(p.mx, p.my));
             ctx.stroke();
         }
     };
 
     allPaths.forEach(drawItem);
     if (currentPath) drawItem(currentPath);
+    ctx.restore();
 
-    // キャンバス枠
-    const tl = getScreenPos(0,0), br = getScreenPos(A3_W, A3_H);
-    ctx.strokeStyle = "rgba(0,0,0,0.1)"; ctx.lineWidth = 1;
-    ctx.strokeRect(tl.x, tl.y, br.x-tl.x, br.y-tl.y);
+    // 枠線
+    ctx.save();
+    ctx.translate(view.x, view.y); ctx.scale(view.scale, view.scale); ctx.translate(-A3_W/2, -A3_H/2);
+    ctx.strokeStyle = "rgba(0,0,0,0.1)"; ctx.lineWidth = 1/view.scale;
+    ctx.strokeRect(0, 0, A3_W, A3_H);
+    ctx.restore();
 }
 
-// タッチ操作（パン・ズーム・描画の完全分離）
 canvas.addEventListener('pointerdown', e => {
     pointers[e.pointerId] = e;
     const pts = Object.values(pointers);
-    
-    if (pts.length === 1 && e.buttons === 1) {
+    if (pts.length === 1) {
         const p = getMapPos(e.clientX, e.clientY);
         if (p.mx < 0 || p.mx > A3_W || p.my < 0 || p.my > A3_H) return;
         if (mode.startsWith('stamp')) {
@@ -157,61 +151,44 @@ canvas.addEventListener('pointerdown', e => {
             currentPath = {points: [p], color: currentColor};
         } else if (mode === 'erase') {
             allPaths = allPaths.filter(i => {
-                if(i.points) return !i.points.some(pt => Math.hypot(pt.mx-p.mx, pt.my-p.my) < 20/view.scale);
-                return Math.hypot(i.mx-p.mx, i.my-p.my) > 20/view.scale;
+                if(i.points) return !i.points.some(pt => Math.hypot(pt.mx-p.mx, pt.my-p.my) < 25/view.scale);
+                return Math.hypot(i.mx-p.mx, i.my-p.my) > 25/view.scale;
             });
         }
-    } else {
-        currentPath = null; // 2本指以上の時は描画中止
-    }
+    } else { currentPath = null; }
     render();
 });
 
 window.addEventListener('pointermove', e => {
     if (!pointers[e.pointerId]) return;
-    const prevPointers = {...pointers};
+    const prev = {...pointers};
     pointers[e.pointerId] = e;
     const pts = Object.values(pointers);
 
     if (pts.length === 2) {
-        // ピンチズーム計算
         const p1 = pts[0], p2 = pts[1];
-        const prev1 = prevPointers[p1.pointerId], prev2 = prevPointers[p2.pointerId];
-        if (prev1 && prev2) {
-            const oldD = Math.hypot(prev1.clientX-prev2.clientX, prev1.clientY-prev2.clientY);
-            const newD = Math.hypot(p1.clientX-p2.clientX, p1.clientY-p2.clientY);
-            const midX = (p1.clientX + p2.clientX) / 2, midY = (p1.clientY + p2.clientY) / 2;
-            const prevMidX = (prev1.clientX + prev2.clientX) / 2, prevMidY = (prev1.clientY + prev2.clientY) / 2;
-
-            if (oldD > 0) view.scale *= (newD / oldD);
-            view.x += midX - prevMidX;
-            view.y += midY - prevMidY;
-        }
+        const oldD = Math.hypot(prev[p1.pointerId].clientX-prev[p2.pointerId].clientX, prev[p1.pointerId].clientY-prev[p2.pointerId].clientY);
+        const newD = Math.hypot(p1.clientX-p2.clientX, p1.clientY-p2.clientY);
+        const midX = (p1.clientX+p2.clientX)/2, midY = (p1.clientY+p2.clientY)/2;
+        const pMidX = (prev[p1.pointerId].clientX+prev[p2.pointerId].clientX)/2, pMidY = (prev[p1.pointerId].clientY+prev[p2.pointerId].clientY)/2;
+        if (oldD > 0) view.scale *= (newD / oldD);
+        view.x += midX - pMidX; view.y += midY - pMidY;
     } else if (pts.length === 1 && currentPath) {
         currentPath.points.push(getMapPos(e.clientX, e.clientY));
-    } else if (pts.length === 1 && !currentPath && e.buttons === 2) {
-        // 右ドラッグやペンボタンでのパン
-        view.x += e.clientX - prevPointers[e.pointerId].clientX;
-        view.y += e.clientY - prevPointers[e.pointerId].clientY;
     }
     render();
 });
 
 const stop = e => {
     if (pointers[e.pointerId] && currentPath) allPaths.push(currentPath);
-    delete pointers[e.pointerId];
-    currentPath = null;
-    render();
+    delete pointers[e.pointerId]; currentPath = null; render();
 };
-window.addEventListener('pointerup', stop);
-window.addEventListener('pointercancel', stop);
+window.addEventListener('pointerup', stop); window.addEventListener('pointercancel', stop);
 
-function setMode(m) { 
-    mode = m; 
-    ['btn-draw','btn-erase','btn-s1','btn-s2','btn-s3'].forEach(id => {
-        const target = (m==='draw'?'btn-draw':m==='erase'?'btn-erase':m==='stamp-circle'?'btn-s1':m==='stamp-dot'?'btn-s2':'btn-s3');
-        document.getElementById(id).className = id === target ? 'active' : '';
-    });
+function setMode(m) {
+    mode = m;
+    const ids = {draw:'btn-draw', erase:'btn-erase', 'stamp-circle':'btn-s1', 'stamp-dot':'btn-s2', 'stamp-double':'btn-s3'};
+    Object.values(ids).forEach(id => document.getElementById(id).className = id === ids[m] ? 'active' : '');
     createColorButtons();
 }
 
