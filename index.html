@@ -3,12 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>猛禽類調査 Pro - Final</title>
+    <title>猛禽類調査 Pro - Absolute Fixed</title>
     <style>
         :root { --accent: #3498db; }
         body { margin: 0; overflow: hidden; background: #dadce3; font-family: sans-serif; position: fixed; width: 100%; height: 100%; touch-action: none; }
-        
-        /* ツールバー */
         #toolbar { 
             position: fixed; top: 10px; left: 10px; z-index: 1000; background: rgba(255,255,255,0.95); 
             padding: 10px; border-radius: 12px; display: flex; flex-direction: column; gap: 6px; 
@@ -16,15 +14,11 @@
         }
         .section-title { font-size: 10px; font-weight: bold; border-left: 3px solid var(--accent); padding-left: 5px; margin-top: 5px; }
         .btn-group { display: flex; flex-wrap: wrap; gap: 4px; }
-        
         button { padding: 8px 4px; cursor: pointer; border: 1px solid #ddd; background: #fff; border-radius: 6px; font-size: 11px; flex: 1; min-width: 40px; }
         button.active { background: var(--accent); color: white; border-color: var(--accent); }
-        
-        /* カラーボタン */
         .color-btn { width: 30px; height: 30px; border-radius: 50%; border: 2px solid transparent; flex: none; cursor: pointer; box-sizing: border-box; }
         .color-btn.selected { border: 2px solid #fff; box-shadow: 0 0 0 2px var(--accent); transform: scale(1.1); }
-
-        canvas { display: block; background: transparent; }
+        canvas { display: block; }
     </style>
 </head>
 <body>
@@ -36,31 +30,26 @@
         <button onclick="document.getElementById('importFile').click()">開く</button>
     </div>
     <input type="file" id="importFile" accept=".json" style="display:none" onchange="importProjectJSON(this)">
-
     <div class="section-title">MAP</div>
     <input type="file" id="mapInput" accept="image/*" style="font-size: 9px; width: 100%;">
     <button onclick="resetView()">全体表示</button>
-
     <div class="section-title">TOOLS</div>
     <div class="btn-group">
         <button id="btn-draw" class="active" onclick="setMode('draw')">ペン</button>
         <button id="btn-erase" onclick="setMode('erase')">消去</button>
         <button onclick="undo()">Undo</button>
     </div>
-
     <div class="section-title">STAMPS</div>
     <div class="btn-group">
         <button id="btn-s1" onclick="setMode('stamp-circle')">〇</button>
         <button id="btn-s2" onclick="setMode('stamp-dot')">●</button>
         <button id="btn-s3" onclick="setMode('stamp-double')">◎</button>
     </div>
-
     <div id="colorPicker" class="btn-group"></div>
-
     <div class="section-title">EXPORT</div>
     <div class="btn-group">
         <button onclick="exportDXF()">DXF</button>
-        <button onclick="window.print()" style="color:var(--accent);">PDF</button>
+        <button onclick="window.print()">PDF</button>
     </div>
 </div>
 
@@ -74,97 +63,106 @@ let mapImage = new Image(), allPaths = [], currentPath = null;
 let mode = 'draw', currentColor = 'red', view = { x: 0, y: 0, scale: 0.5 }, lastPointers = [];
 
 function init() {
-    window.addEventListener('resize', resize);
-    resize();
-    view.x = window.innerWidth / 2;
-    view.y = window.innerHeight / 2;
-    createColorButtons();
-    render();
+    window.addEventListener('resize', resize); resize();
+    view.x = window.innerWidth / 2; view.y = window.innerHeight / 2;
+    createColorButtons(); render();
 }
 
 function resize() {
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = window.innerWidth * dpr;
-    canvas.height = window.innerHeight * dpr;
-    canvas.style.width = window.innerWidth + 'px';
-    canvas.style.height = window.innerHeight + 'px';
-    ctx.scale(dpr, dpr);
+    canvas.width = window.innerWidth * dpr; canvas.height = window.innerHeight * dpr;
+    canvas.style.width = window.innerWidth + 'px'; canvas.style.height = window.innerHeight + 'px';
     render();
 }
 
-function toCanvas(sx, sy) {
-    const rect = canvas.getBoundingClientRect();
-    return { 
-        x: (sx - rect.left - view.x) / view.scale + A3_W / 2, 
-        y: (sy - rect.top - view.y) / view.scale + A3_H / 2 
+// キャンバス座標(0-1587)から画面上のピクセル座標に変換する
+function toScreen(x, y) {
+    return {
+        sx: (x - A3_W / 2) * view.scale + view.x,
+        sy: (y - A3_H / 2) * view.scale + view.y
+    };
+}
+
+// 画面上のピクセル座標からキャンバス座標(0-1587)に変換する
+function fromScreen(sx, sy) {
+    return {
+        x: (sx - view.x) / view.scale + A3_W / 2,
+        y: (sy - view.y) / view.scale + A3_H / 2
     };
 }
 
 function render() {
     const dpr = window.devicePixelRatio || 1;
-    ctx.save();
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // 常にデバイスピクセル比でリセット
     ctx.fillStyle = "#dadce3"; ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
-    ctx.restore();
 
+    // --- 1. 地図と紙を描画（ここは拡大縮小に追従） ---
     ctx.save();
     ctx.translate(view.x, view.y);
     ctx.scale(view.scale, view.scale);
     ctx.translate(-A3_W/2, -A3_H/2);
-
-    // 紙の描画
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(0, 0, A3_W, A3_H);
     
-    // 画像
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, A3_W, A3_H); // 紙
     if (mapImage.complete && mapImage.naturalWidth > 0) {
         const s = Math.min(A3_W/mapImage.naturalWidth, A3_H/mapImage.naturalHeight);
         ctx.drawImage(mapImage, (A3_W-mapImage.naturalWidth*s)/2, (A3_H-mapImage.naturalHeight*s)/2, mapImage.naturalWidth*s, mapImage.naturalHeight*s);
     }
+    ctx.restore();
 
-    // 描画
-    const draw = (item) => {
+    // --- 2. 描画アイテムを「画面ピクセル基準」で描画（ここが太さ固定の肝） ---
+    const drawItem = (item) => {
         if (!item) return;
         ctx.strokeStyle = ctx.fillStyle = item.color;
-        ctx.lineWidth = 2.5 / view.scale; // 太さ固定
+        ctx.lineCap = ctx.lineJoin = "round";
+        ctx.lineWidth = 3; // ★完全に固定（何があっても3ピクセル）
+
         if (item.type && item.type.startsWith('stamp')) {
-            const r = 12 / view.scale; // 半径固定
-            ctx.beginPath(); ctx.arc(item.x, item.y, r, 0, Math.PI*2);
+            const {sx, sy} = toScreen(item.x, item.y);
+            const r = 12; // ★半径も常に12ピクセル
+            ctx.beginPath(); ctx.arc(sx, sy, r, 0, Math.PI*2);
             item.type === 'stamp-dot' ? ctx.fill() : ctx.stroke();
             if (item.type === 'stamp-double') {
-                ctx.beginPath(); ctx.arc(item.x, item.y, r*0.6, 0, Math.PI*2); ctx.stroke();
+                ctx.beginPath(); ctx.arc(sx, sy, r*0.6, 0, Math.PI*2); ctx.stroke();
             }
-        } else if (item.points) {
-            ctx.beginPath(); ctx.lineCap = ctx.lineJoin = "round";
-            ctx.moveTo(item.points[0].x, item.points[0].y);
-            item.points.forEach(p => ctx.lineTo(p.x, p.y));
+        } else if (item.points && item.points.length >= 1) {
+            ctx.beginPath();
+            const start = toScreen(item.points[0].x, item.points[0].y);
+            ctx.moveTo(start.sx, start.sy);
+            for(let i=1; i<item.points.length; i++) {
+                const p = toScreen(item.points[i].x, item.points[i].y);
+                ctx.lineTo(p.sx, p.sy);
+            }
             ctx.stroke();
         }
     };
 
-    allPaths.forEach(draw);
-    if (currentPath) draw(currentPath);
+    allPaths.forEach(drawItem);
+    if (currentPath) drawItem(currentPath);
+
+    // 外枠（ガイド）
+    ctx.save();
+    const tl = toScreen(0,0), br = toScreen(A3_W, A3_H);
+    ctx.strokeStyle = "rgba(0,0,0,0.15)"; ctx.lineWidth = 1;
+    ctx.strokeRect(tl.sx, tl.sy, br.sx-tl.sx, br.sy-tl.sy);
     ctx.restore();
 }
 
+// イベント処理（fromScreen/toScreenを使用するように修正）
 canvas.addEventListener('pointerdown', e => {
-    if (lastPointers.findIndex(p => p.pointerId === e.pointerId) === -1) {
-        lastPointers.push(e);
-    }
-    if (lastPointers.length > 1) {
-        currentPath = null;
-    } else {
-        const pt = toCanvas(e.clientX, e.clientY);
+    if (lastPointers.findIndex(p => p.pointerId === e.pointerId) === -1) lastPointers.push(e);
+    if (lastPointers.length > 1) { currentPath = null; } 
+    else {
+        const pt = fromScreen(e.clientX, e.clientY);
         if (pt.x < 0 || pt.x > A3_W || pt.y < 0 || pt.y > A3_H) return;
         if (mode.startsWith('stamp')) {
             allPaths.push({type: mode, x: pt.x, y: pt.y, color: currentColor});
             render();
         } else if (mode === 'draw') {
-            currentPath = {points: [pt], color: currentColor};
+            currentPath = {type: 'draw', points: [pt], color: currentColor};
         } else if (mode === 'erase') {
             allPaths = allPaths.filter(i => {
-                const dist = i.points ? i.points.some(p => Math.hypot(p.x-pt.x, p.y-pt.y) < 25/view.scale) : Math.hypot(i.x-pt.x, i.y-pt.y) < 25/view.scale;
-                return !dist;
+                if(i.points) return !i.points.some(p => Math.hypot(p.x-pt.x, p.y-pt.y) < 25/view.scale);
+                return Math.hypot(i.x-pt.x, i.y-pt.y) > 25/view.scale;
             });
             render();
         }
@@ -175,64 +173,52 @@ window.addEventListener('pointermove', e => {
     const i = lastPointers.findIndex(p => p.pointerId === e.pointerId);
     if (i === -1) return;
     if (lastPointers.length > 1) {
-        const p1 = lastPointers[0], p2 = lastPointers[1];
-        if (e.pointerId === p1.pointerId || e.pointerId === p2.pointerId) {
-            const o = lastPointers[i === 0 ? 1 : 0];
-            const oldD = Math.hypot(lastPointers[i].clientX - o.clientX, lastPointers[i].clientY - o.clientY);
-            const newD = Math.hypot(e.clientX - o.clientX, e.clientY - o.clientY);
-            if (oldD > 0) view.scale *= (newD / oldD);
-            view.x += e.clientX - lastPointers[i].clientX;
-            view.y += e.clientY - lastPointers[i].clientY;
-        }
+        const o = lastPointers[i === 0 ? 1 : 0];
+        const oldD = Math.hypot(lastPointers[i].clientX-o.clientX, lastPointers[i].clientY-o.clientY);
+        const newD = Math.hypot(e.clientX-o.clientX, e.clientY-o.clientY);
+        if (oldD > 0) view.scale *= (newD / oldD);
+        view.x += e.clientX - lastPointers[i].clientX;
+        view.y += e.clientY - lastPointers[i].clientY;
     } else if (currentPath) {
-        currentPath.points.push(toCanvas(e.clientX, e.clientY));
+        currentPath.points.push(fromScreen(e.clientX, e.clientY));
     }
-    lastPointers[i] = e;
-    render();
+    lastPointers[i] = e; render();
 });
 
 const end = e => { 
     lastPointers = lastPointers.filter(p => p.pointerId !== e.pointerId); 
-    if (currentPath) { allPaths.push(currentPath); currentPath = null; }
+    if (lastPointers.length === 0 && currentPath) { allPaths.push(currentPath); currentPath = null; }
     render(); 
 };
-window.addEventListener('pointerup', end);
-window.addEventListener('pointercancel', end);
+window.addEventListener('pointerup', end); window.addEventListener('pointercancel', end);
 
 function setMode(m) { 
     mode = m; 
     const btns = {draw:'btn-draw', erase:'btn-erase', 'stamp-circle':'btn-s1', 'stamp-dot':'btn-s2', 'stamp-double':'btn-s3'};
-    Object.values(btns).forEach(id => document.getElementById(id).className = '');
-    document.getElementById(btns[m]).className = 'active';
+    Object.values(btns).forEach(id => document.getElementById(id).className = id === btns[m] ? 'active' : '');
     createColorButtons();
 }
 
 function createColorButtons() {
-    const cp = document.getElementById('colorPicker');
-    cp.innerHTML = '';
+    const cp = document.getElementById('colorPicker'); cp.innerHTML = '';
     ['red', 'blue', 'purple', 'green', 'orange', 'black'].forEach(c => {
-        const b = document.createElement('div');
-        b.className = 'color-btn' + (c === currentColor ? ' selected' : '');
-        b.style.background = c;
-        b.onclick = () => { currentColor = c; createColorButtons(); if(mode==='erase') setMode('draw'); };
+        const b = document.createElement('div'); b.className = 'color-btn' + (c===currentColor?' selected':'');
+        b.style.background = c; b.onclick = () => { currentColor = c; createColorButtons(); if(mode==='erase') setMode('draw'); };
         cp.appendChild(b);
     });
 }
 
 function resetView() {
     const s = Math.min((window.innerWidth-60)/A3_W, (window.innerHeight-60)/A3_H);
-    view = { x: window.innerWidth/2, y: window.innerHeight/2, scale: s };
-    render();
+    view = { x: window.innerWidth/2, y: window.innerHeight/2, scale: s }; render();
 }
 
 document.getElementById('mapInput').onchange = e => {
-    const r = new FileReader();
-    r.onload = f => { mapImage = new Image(); mapImage.onload = resetView; mapImage.src = f.target.result; };
+    const r = new FileReader(); r.onload = f => { mapImage = new Image(); mapImage.onload = resetView; mapImage.src = f.target.result; };
     r.readAsDataURL(e.target.files[0]);
 };
 
 function undo() { allPaths.pop(); render(); }
-
 function exportDXF() {
     let d = "0\nSECTION\n2\nENTITIES\n";
     const cm = {red:1, blue:5, purple:6, green:3, orange:40, black:7};
@@ -242,9 +228,7 @@ function exportDXF() {
             d += `0\nPOLYLINE\n8\nSurvey\n62\n${c}\n66\n1\n`;
             i.points.forEach(p => d += `0\nVERTEX\n8\nSurvey\n10\n${p.x}\n20\n${-p.y}\n`);
             d += "0\nSEQEND\n";
-        } else {
-            d += `0\nCIRCLE\n8\nSurvey\n62\n${c}\n10\n${i.x}\n20\n${-i.y}\n40\n15.0\n`;
-        }
+        } else d += `0\nCIRCLE\n8\nSurvey\n62\n${c}\n10\n${i.x}\n20\n${-i.y}\n40\n15.0\n`;
     });
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([d+"0\nENDSEC\n0\nEOF"], {type:"application/dxf"}));
     a.download = "survey.dxf"; a.click();
