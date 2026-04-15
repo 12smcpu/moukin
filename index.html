@@ -261,12 +261,23 @@ function exportPDF() {
 }
 
 function exportDXF() {
+    // 成功した初期コードの構造を厳守
     let dxfContent = "0\nSECTION\n2\nENTITIES\n";
     
+    // AutoCADが確実に認識する基本7色のみに限定
+    const colorMap = { 'red': 1, 'blue': 5, 'purple': 6, 'green': 3, 'orange': 40, 'black': 7 };
+    
     allPaths.forEach(path => {
-        dxfContent += "0\nPOLYLINE\n8\nFlightPath\n66\n1\n";
-        path.forEach(pt => {
-            // Y軸はCADでは上方向が正のため反転させる
+        // 現在のデータ構造 path.points を使用
+        if (!path.points || path.points.length < 2) return;
+
+        const dxfColor = colorMap[path.color] || 7;
+
+        // 初期コードと同じ順序で記述（色だけ追加）
+        dxfContent += "0\nPOLYLINE\n8\nFlightPath\n62\n" + dxfColor + "\n66\n1\n";
+        
+        path.points.forEach(pt => {
+            // 成功した初期コードと同じ座標変換
             dxfContent += `0\nVERTEX\n8\nFlightPath\n10\n${pt.x}\n20\n${-pt.y}\n`;
         });
         dxfContent += "0\nSEQEND\n";
@@ -277,7 +288,7 @@ function exportDXF() {
     const blob = new Blob([dxfContent], {type: 'application/dxf'});
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = "flight_path.dxf";
+    link.download = `Survey_${Date.now()}.dxf`;
     link.click();
 }
 
