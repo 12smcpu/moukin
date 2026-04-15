@@ -3,35 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>猛禽類調査デジタル野帳 Pro</title>
+    <title>猛禽類調査 Pro - Precision Update</title>
     <style>
-        :root { 
-            --bg-color: #34495e; 
-            --ui-bg: rgba(255, 255, 255, 0.95);
-            --accent: #3498db;
-        }
-        body { margin: 0; overflow: hidden; background: var(--bg-color); font-family: sans-serif; }
-        
+        :root { --bg-color: #34495e; --ui-bg: rgba(255, 255, 255, 0.95); --accent: #3498db; }
+        body { margin: 0; overflow: hidden; background: var(--bg-color); font-family: sans-serif; position: fixed; width: 100%; height: 100%; }
         #toolbar { 
-            position: fixed; top: 10px; left: 10px; z-index: 1000;
-            background: var(--ui-bg); padding: 12px; border-radius: 12px;
-            display: flex; flex-direction: column; gap: 8px; 
-            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
-            width: 200px; max-height: 90vh; overflow-y: auto;
+            position: fixed; top: 10px; left: 10px; z-index: 1000; background: var(--ui-bg); 
+            padding: 12px; border-radius: 12px; display: flex; flex-direction: column; gap: 8px; 
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3); width: 200px; max-height: 90vh; overflow-y: auto;
         }
-        
         .section-title { font-size: 10px; font-weight: bold; color: #2c3e50; border-left: 3px solid var(--accent); padding-left: 6px; }
         .btn-group { display: flex; flex-wrap: wrap; gap: 4px; }
-        
-        button { 
-            padding: 8px; cursor: pointer; border: 1px solid #ddd; 
-            background: #fff; border-radius: 6px; font-size: 11px; flex: 1;
-        }
+        button { padding: 8px; cursor: pointer; border: 1px solid #ddd; background: #fff; border-radius: 6px; font-size: 11px; flex: 1; }
         button.active { background: var(--accent); color: white; border-color: var(--accent); }
         .color-btn { width: 28px; height: 28px; border-radius: 50%; border: 2px solid #fff; flex: none; }
-        
-        #viewport { width: 100vw; height: 100vh; display: block; touch-action: none; }
-
+        #viewport { width: 100vw; height: 100vh; display: block; touch-action: none; background: transparent; }
         @media print {
             @page { size: A3 landscape; margin: 0; }
             #toolbar { display: none !important; }
@@ -49,20 +35,16 @@
         <button onclick="document.getElementById('importFile').click()">開く</button>
         <input type="file" id="importFile" accept=".json" style="display:none" onchange="importProjectJSON(this)">
     </div>
-
-    <div class="section-title">MAP (A3)</div>
+    <div class="section-title">MAP (A3 CLIP)</div>
     <input type="file" id="mapInput" accept="image/*" style="font-size: 9px; width: 100%;">
     <button onclick="resetView()">全体表示</button>
-
     <div class="section-title">TOOLS</div>
     <div class="btn-group">
         <button id="btn-draw" class="active" onclick="setMode('draw')">ペン</button>
         <button id="btn-erase" onclick="setMode('erase')">消しゴム</button>
         <button onclick="undo()">Undo</button>
     </div>
-
     <div class="btn-group" id="colorPicker"></div>
-
     <div class="section-title">EXPORT</div>
     <div class="btn-group">
         <button onclick="exportDXF()">DXF</button>
@@ -76,12 +58,12 @@
 const A3_W = 1587, A3_H = 1123;
 const canvas = document.getElementById('viewport');
 const ctx = canvas.getContext('2d');
-
 let mapImage = new Image();
 let allPaths = [], currentPath = null;
 let mode = 'draw', currentColor = 'red';
 let view = { x: 0, y: 0, scale: 0.4 };
-let isPanning = false, lastPointers = [];
+let lastPointers = [];
+let isPanning = false;
 
 function init() {
     window.addEventListener('resize', resize);
@@ -91,30 +73,68 @@ function init() {
     render();
 }
 
+// ズレ防止のための高解像度リサイズ処理
 function resize() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = window.innerWidth * dpr;
+    canvas.height = window.innerHeight * dpr;
+    canvas.style.width = window.innerWidth + 'px';
+    canvas.style.height = window.innerHeight + 'px';
+    ctx.scale(dpr, dpr);
     render();
 }
 
+// スクリーン座標からA3座標への厳密な変換
 function toCanvas(sx, sy) {
-    return { x: (sx - view.x) / view.scale + A3_W / 2, y: (sy - view.y) / view.scale + A3_H / 2 };
+    const rect = canvas.getBoundingClientRect();
+    const x = sx - rect.left;
+    const y = sy - rect.top;
+    return { 
+        x: (x - view.x) / view.scale + A3_W / 2, 
+        y: (y - view.y) / view.scale + A3_H / 2 
+    };
 }
 
 function render() {
+    ctx.save();
+    ctx.setTransform(window.devicePixelRatio || 1, 0, 0, window.devicePixelRatio || 1, 0, 0); // リセット
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+
     ctx.save();
     ctx.translate(view.x, view.y);
     ctx.scale(view.scale, view.scale);
     ctx.translate(-A3_W / 2, -A3_H / 2);
 
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, A3_W, A3_H); // A3ベース
-    
-    if (mapImage.complete && mapImage.src) ctx.drawImage(mapImage, 0, 0, A3_W, A3_H);
+    // 1. A3の紙の範囲のみを描画対象にする（はみ出し制限）
+    ctx.beginPath();
+    ctx.rect(0, 0, A3_W, A3_H);
+    ctx.clip(); // これ以降、この四角形の外には描画されない
 
-    [...allPaths, ...(currentPath ? [currentPath] : [])].forEach(path => {
-        if (path.points.length < 2) return;
+    // 2. キャンバス背景
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, A3_W, A3_H);
+    
+    // 3. 地図描画（トリミング計算）
+    if (mapImage.complete && mapImage.src) {
+        const imgRatio = mapImage.width / mapImage.height;
+        const canvasRatio = A3_W / A3_H;
+        let sx, sy, sWidth, sHeight;
+        if (imgRatio > canvasRatio) {
+            sHeight = mapImage.height;
+            sWidth = mapImage.height * canvasRatio;
+            sx = (mapImage.width - sWidth) / 2; sy = 0;
+        } else {
+            sWidth = mapImage.width;
+            sHeight = mapImage.width / canvasRatio;
+            sx = 0; sy = (mapImage.height - sHeight) / 2;
+        }
+        ctx.drawImage(mapImage, sx, sy, sWidth, sHeight, 0, 0, A3_W, A3_H);
+    }
+
+    // 4. パス描画
+    const drawPath = (path) => {
+        if (!path || path.points.length < 2) return;
         ctx.beginPath();
         ctx.strokeStyle = path.color;
         ctx.lineWidth = 3 / view.scale;
@@ -122,46 +142,62 @@ function render() {
         ctx.moveTo(path.points[0].x, path.points[0].y);
         path.points.forEach(pt => ctx.lineTo(pt.x, pt.y));
         ctx.stroke();
-    });
+    };
+
+    allPaths.forEach(drawPath);
+    if (currentPath) drawPath(currentPath);
+
+    ctx.restore();
+    
+    // 枠線の描画（はみ出し制限の外側にガイドとして）
+    ctx.save();
+    ctx.translate(view.x, view.y);
+    ctx.scale(view.scale, view.scale);
+    ctx.translate(-A3_W / 2, -A3_H / 2);
+    ctx.strokeStyle = "rgba(0,0,0,0.2)";
+    ctx.lineWidth = 1 / view.scale;
+    ctx.strokeRect(0, 0, A3_W, A3_H);
     ctx.restore();
 }
 
-// iPhone用マルチタッチ & マウス対応イベント
-canvas.addEventListener('pointerdown', (e) => {
+// 操作イベント（iPhone/iPadズレ対策）
+canvas.addEventListener('pointerdown', e => {
     lastPointers.push(e);
     if (lastPointers.length > 1 || e.buttons === 2) {
         isPanning = true;
-    } else if (e.buttons === 1 && !isPanning) {
+        currentPath = null;
+    } else if (e.buttons === 1) {
         const pt = toCanvas(e.clientX, e.clientY);
-        if (mode === 'draw') currentPath = { points: [pt], color: currentColor };
-        else allPaths = allPaths.filter(p => !p.points.some(ppp => Math.hypot(ppp.x-pt.x, ppp.y-pt.y) < 20/view.scale));
+        // A3枠内のみ描画開始を許可
+        if (pt.x >= 0 && pt.x <= A3_W && pt.y >= 0 && pt.y <= A3_H) {
+            if (mode === 'draw') currentPath = { points: [pt], color: currentColor };
+            else allPaths = allPaths.filter(p => !p.points.some(ppp => Math.hypot(ppp.x-pt.x, ppp.y-pt.y) < 20/view.scale));
+        }
     }
 });
 
-window.addEventListener('pointermove', (e) => {
+window.addEventListener('pointermove', e => {
     const idx = lastPointers.findIndex(p => p.pointerId === e.pointerId);
     if (idx !== -1) {
         const prev = lastPointers[idx];
         if (isPanning) {
-            if (lastPointers.length === 2) { // ピンチズーム
+            if (lastPointers.length === 2) {
                 const other = lastPointers[idx === 0 ? 1 : 0];
                 const oldDist = Math.hypot(prev.clientX - other.clientX, prev.clientY - other.clientY);
                 const newDist = Math.hypot(e.clientX - other.clientX, e.clientY - other.clientY);
-                const zoom = newDist / oldDist;
-                view.scale *= zoom;
+                view.scale *= (newDist / oldDist);
             }
             view.x += e.clientX - prev.clientX;
             view.y += e.clientY - prev.clientY;
-            render();
         } else if (currentPath) {
             currentPath.points.push(toCanvas(e.clientX, e.clientY));
-            render();
         }
         lastPointers[idx] = e;
+        render();
     }
 });
 
-window.addEventListener('pointerup', (e) => {
+window.addEventListener('pointerup', e => {
     lastPointers = lastPointers.filter(p => p.pointerId !== e.pointerId);
     if (lastPointers.length === 0) {
         if (currentPath) { allPaths.push(currentPath); currentPath = null; }
@@ -170,27 +206,22 @@ window.addEventListener('pointerup', (e) => {
     render();
 });
 
-canvas.addEventListener('wheel', e => {
-    e.preventDefault();
-    const factor = Math.pow(0.999, e.deltaY);
-    view.x = e.clientX - (e.clientX - view.x) * factor;
-    view.y = e.clientY - (e.clientY - view.y) * factor;
-    view.scale *= factor;
+// ファイル入出力などは以前のものを継承
+function resetView() {
+    const padding = 40;
+    view.scale = Math.min((window.innerWidth-padding) / A3_W, (window.innerHeight-padding) / A3_H);
+    view.x = window.innerWidth / 2;
+    view.y = window.innerHeight / 2;
     render();
-}, { passive: false });
-
-function exportPDF() {
-    const oldView = {...view};
-    const scale = Math.min(canvas.width / A3_W, canvas.height / A3_H);
-    view = { x: canvas.width/2, y: canvas.height/2, scale: scale };
-    render();
-    setTimeout(() => { window.print(); view = oldView; render(); }, 300);
 }
 
-// JSON / DXF / UI 関連 (中略)
 document.getElementById('mapInput').onchange = e => {
     const reader = new FileReader();
-    reader.onload = f => { mapImage = new Image(); mapImage.onload = () => { resetView(); render(); }; mapImage.src = f.target.result; };
+    reader.onload = f => { 
+        mapImage = new Image(); 
+        mapImage.onload = () => { resetView(); }; 
+        mapImage.src = f.target.result; 
+    };
     reader.readAsDataURL(e.target.files[0]);
 };
 
@@ -205,9 +236,32 @@ function importProjectJSON(input) {
     reader.onload = e => {
         const data = JSON.parse(e.target.result);
         allPaths = data.paths || [];
-        mapImage = new Image(); mapImage.onload = () => { resetView(); render(); }; mapImage.src = data.map;
+        mapImage = new Image(); 
+        mapImage.onload = () => { resetView(); }; 
+        mapImage.src = data.map;
     };
     reader.readAsText(input.files[0]);
+}
+
+function exportPDF() {
+    const oldView = {...view};
+    const scale = Math.min(window.innerWidth / A3_W, window.innerHeight / A3_H);
+    view = { x: window.innerWidth/2, y: window.innerHeight/2, scale: scale };
+    render();
+    setTimeout(() => { window.print(); view = oldView; render(); }, 300);
+}
+
+function exportDXF() {
+    let dxf = "0\nSECTION\n2\nENTITIES\n";
+    allPaths.forEach(path => {
+        dxf += "0\nPOLYLINE\n8\nFlightPath\n62\n" + (path.color === 'red' ? 1 : 7) + "\n66\n1\n";
+        path.points.forEach(pt => { dxf += `0\nVERTEX\n10\n${pt.x.toFixed(2)}\n20\n${-pt.y.toFixed(2)}\n`; });
+        dxf += "0\nSEQEND\n";
+    });
+    dxf += "0\nENDSEC\n0\nEOF";
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([dxf], {type: 'application/dxf'}));
+    a.download = "SurveyLines.dxf"; a.click();
 }
 
 const colors = ['red', 'blue', 'purple', 'green', 'orange', 'black'];
@@ -223,22 +277,7 @@ function setMode(m) {
     document.getElementById('btn-erase').className = m==='erase'?'active':'';
 }
 function undo() { allPaths.pop(); render(); }
-function resetView() { view = { x: canvas.width/2, y: canvas.height/2, scale: (canvas.width/A3_W)*0.8 }; render(); }
 canvas.addEventListener('contextmenu', e => e.preventDefault());
-
-function exportDXF() {
-    let dxf = "0\nSECTION\n2\nENTITIES\n";
-    allPaths.forEach(path => {
-        dxf += "0\nPOLYLINE\n8\nFlightPath\n62\n" + (path.color === 'red' ? 1 : 7) + "\n66\n1\n";
-        path.points.forEach(pt => { dxf += `0\nVERTEX\n10\n${pt.x.toFixed(2)}\n20\n${-pt.y.toFixed(2)}\n`; });
-        dxf += "0\nSEQEND\n";
-    });
-    dxf += "0\nENDSEC\n0\nEOF";
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([dxf], {type: 'application/dxf'}));
-    a.download = "SurveyLines.dxf"; a.click();
-}
-
 init();
 </script>
 </body>
