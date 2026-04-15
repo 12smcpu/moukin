@@ -3,54 +3,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>猛禽類調査 Pro - Fixed Version</title>
+    <title>猛禽類調査 Pro - Final</title>
     <style>
-        :root { --bg-color: #dadce3; --ui-bg: rgba(255, 255, 255, 0.95); --accent: #3498db; }
-        body { margin: 0; overflow: hidden; background: var(--bg-color); font-family: sans-serif; position: fixed; width: 100%; height: 100%; }
+        :root { --accent: #3498db; }
+        body { margin: 0; overflow: hidden; background: #dadce3; font-family: sans-serif; position: fixed; width: 100%; height: 100%; touch-action: none; }
+        
+        /* ツールバー */
         #toolbar { 
-            position: fixed; top: 10px; left: 10px; z-index: 1000; background: var(--ui-bg); 
-            padding: 12px; border-radius: 12px; display: flex; flex-direction: column; gap: 8px; 
-            box-shadow: 0 8px 20px rgba(0,0,0,0.1); width: 200px; max-height: 90vh; overflow-y: auto;
+            position: fixed; top: 10px; left: 10px; z-index: 1000; background: rgba(255,255,255,0.95); 
+            padding: 10px; border-radius: 12px; display: flex; flex-direction: column; gap: 6px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15); width: 180px; max-height: 90vh; overflow-y: auto;
         }
-        .section-title { font-size: 10px; font-weight: bold; border-left: 3px solid var(--accent); padding-left: 6px; }
+        .section-title { font-size: 10px; font-weight: bold; border-left: 3px solid var(--accent); padding-left: 5px; margin-top: 5px; }
         .btn-group { display: flex; flex-wrap: wrap; gap: 4px; }
-        button { padding: 8px; cursor: pointer; border: 1px solid #ddd; background: #fff; border-radius: 6px; font-size: 11px; flex: 1; }
+        
+        button { padding: 8px 4px; cursor: pointer; border: 1px solid #ddd; background: #fff; border-radius: 6px; font-size: 11px; flex: 1; min-width: 40px; }
         button.active { background: var(--accent); color: white; border-color: var(--accent); }
-        .color-btn { width: 32px; height: 32px; border-radius: 50%; border: 2px solid transparent; flex: none; transition: 0.2s; cursor: pointer; }
-        .color-btn.selected { border: 3px solid #fff !important; box-shadow: 0 0 0 2px var(--accent); transform: scale(1.1); }
-        #viewport { width: 100vw; height: 100vh; display: block; touch-action: none; }
-        @media print { #toolbar { display: none; } body { background: white; } }
+        
+        /* カラーボタン */
+        .color-btn { width: 30px; height: 30px; border-radius: 50%; border: 2px solid transparent; flex: none; cursor: pointer; box-sizing: border-box; }
+        .color-btn.selected { border: 2px solid #fff; box-shadow: 0 0 0 2px var(--accent); transform: scale(1.1); }
+
+        canvas { display: block; background: transparent; }
     </style>
 </head>
 <body>
 
 <div id="toolbar">
-    <div class="section-title">PROJECT</div>
+    <div class="section-title">FILE</div>
     <div class="btn-group">
         <button onclick="exportProjectJSON()">保存</button>
         <button onclick="document.getElementById('importFile').click()">開く</button>
-        <input type="file" id="importFile" accept=".json" style="display:none" onchange="importProjectJSON(this)">
     </div>
+    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importProjectJSON(this)">
+
     <div class="section-title">MAP</div>
     <input type="file" id="mapInput" accept="image/*" style="font-size: 9px; width: 100%;">
     <button onclick="resetView()">全体表示</button>
-    <div class="section-title">DRAW</div>
+
+    <div class="section-title">TOOLS</div>
     <div class="btn-group">
         <button id="btn-draw" class="active" onclick="setMode('draw')">ペン</button>
         <button id="btn-erase" onclick="setMode('erase')">消去</button>
         <button onclick="undo()">Undo</button>
     </div>
-    <div class="section-title">STAMP</div>
+
+    <div class="section-title">STAMPS</div>
     <div class="btn-group">
         <button id="btn-s1" onclick="setMode('stamp-circle')">〇</button>
         <button id="btn-s2" onclick="setMode('stamp-dot')">●</button>
         <button id="btn-s3" onclick="setMode('stamp-double')">◎</button>
     </div>
+
     <div id="colorPicker" class="btn-group"></div>
+
     <div class="section-title">EXPORT</div>
     <div class="btn-group">
         <button onclick="exportDXF()">DXF</button>
-        <button onclick="exportPDF()" style="color:var(--accent); font-weight:bold;">PDF</button>
+        <button onclick="window.print()" style="color:var(--accent);">PDF</button>
     </div>
 </div>
 
@@ -60,50 +70,4 @@
 const A3_W = 1587, A3_H = 1123;
 const canvas = document.getElementById('viewport');
 const ctx = canvas.getContext('2d');
-let mapImage = new Image(), allPaths = [], currentPath = null;
-let mode = 'draw', currentColor = 'red', view = { x: 0, y: 0, scale: 0.4 }, lastPointers = [], isPanning = false;
-
-function init() {
-    window.addEventListener('resize', resize); resize();
-    view.x = window.innerWidth / 2; view.y = window.innerHeight / 2;
-    createColorButtons(); render();
-}
-
-function resize() {
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = window.innerWidth * dpr; canvas.height = window.innerHeight * dpr;
-    canvas.style.width = window.innerWidth + 'px'; canvas.style.height = window.innerHeight + 'px';
-    ctx.scale(dpr, dpr); render();
-}
-
-function toCanvas(sx, sy) {
-    const rect = canvas.getBoundingClientRect();
-    return { 
-        x: (sx - rect.left - view.x) / view.scale + A3_W / 2, 
-        y: (sy - rect.top - view.y) / view.scale + A3_H / 2 
-    };
-}
-
-function render() {
-    const dpr = window.devicePixelRatio || 1;
-    ctx.save();
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = "#dadce3"; ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
-    ctx.restore();
-
-    ctx.save();
-    ctx.translate(view.x, view.y); ctx.scale(view.scale, view.scale); ctx.translate(-A3_W/2, -A3_H/2);
-    ctx.beginPath(); ctx.rect(0, 0, A3_W, A3_H); ctx.clip();
-    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, A3_W, A3_H);
-    
-    if (mapImage.complete && mapImage.naturalWidth > 0) {
-        const s = Math.min(A3_W/mapImage.naturalWidth, A3_H/mapImage.naturalHeight);
-        ctx.drawImage(mapImage, (A3_W-mapImage.naturalWidth*s)/2, (A3_H-mapImage.naturalHeight*s)/2, mapImage.naturalWidth*s, mapImage.naturalHeight*s);
-    }
-
-    const draw = (item) => {
-        if (!item) return;
-        ctx.strokeStyle = ctx.fillStyle = item.color;
-        ctx.lineWidth = 2.5 / view.scale; // ★太さをズームに合わせる
-        if (item.type && item.type.startsWith('stamp')) {
-            const r = 1
+let mapImage = new Image(), allPaths = [], currentPath
