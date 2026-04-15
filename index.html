@@ -218,11 +218,17 @@ canvas.addEventListener('pointerdown', e => {
         }
     }
 });
+// --- 操作イベント：パンと描画の競合を解消 ---
 canvas.addEventListener('pointerdown', e => {
-    lastPointers.push(e);
+    // 既存のポインター情報をクリアして新しく追加（重複防止）
+    const idx = lastPointers.findIndex(p => p.pointerId === e.pointerId);
+    if (idx === -1) lastPointers.push(e);
+
     if (lastPointers.length > 1 || e.buttons === 2) {
-        isPanning = true; currentPath = null;
+        isPanning = true;
+        currentPath = null;
     } else if (e.buttons === 1) {
+        isPanning = false; // 1本指の時はパンを強制オフ
         const pt = toCanvas(e.clientX, e.clientY);
         if (pt.x < 0 || pt.x > A3_W || pt.y < 0 || pt.y > A3_H) return;
 
@@ -233,8 +239,11 @@ canvas.addEventListener('pointerdown', e => {
             currentPath = { type: 'draw', points: [pt], color: currentColor };
         } else if (mode === 'erase') {
             allPaths = allPaths.filter(item => {
-                if (item.type === 'draw') return !item.points.some(p => Math.hypot(p.x-pt.x, p.y-pt.y) < 20/view.scale);
-                return Math.hypot(item.x-pt.x, item.y-pt.y) > 20/view.scale;
+                if (item.points) {
+                    return !item.points.some(p => Math.hypot(p.x-pt.x, p.y-pt.y) < 25/view.scale);
+                } else {
+                    return Math.hypot(item.x-pt.x, item.y-pt.y) > 25/view.scale;
+                }
             });
             render();
         }
@@ -244,6 +253,7 @@ canvas.addEventListener('pointerdown', e => {
 window.addEventListener('pointermove', e => {
     const idx = lastPointers.findIndex(p => p.pointerId === e.pointerId);
     if (idx === -1) return;
+    
     const prev = lastPointers[idx];
     if (isPanning) {
         if (lastPointers.length === 2) {
@@ -252,7 +262,8 @@ window.addEventListener('pointermove', e => {
             const newDist = Math.hypot(e.clientX - other.clientX, e.clientY - other.clientY);
             view.scale *= (newDist / oldDist);
         }
-        view.x += e.clientX - prev.clientX; view.y += e.clientY - prev.clientY;
+        view.x += e.clientX - prev.clientX;
+        view.y += e.clientY - prev.clientY;
     } else if (currentPath) {
         currentPath.points.push(toCanvas(e.clientX, e.clientY));
     }
@@ -260,14 +271,22 @@ window.addEventListener('pointermove', e => {
     render();
 });
 
-window.addEventListener('pointerup', e => {
+// 指を離した時、または画面外に出た時の処理
+const handlePointerUp = e => {
     lastPointers = lastPointers.filter(p => p.pointerId !== e.pointerId);
     if (lastPointers.length === 0) {
-        if (currentPath) { allPaths.push(currentPath); currentPath = null; }
+        if (currentPath) {
+            allPaths.push(currentPath);
+            currentPath = null;
+        }
         isPanning = false;
     }
     render();
-});
+};
+
+window.addEventListener('pointerup', handlePointerUp);
+window.addEventListener('pointercancel', handlePointerUp); // システム割り込み対策
+window.addEventListener('pointerout', handlePointerUp);   // 画面外対策
 
 function exportDXF() {
     let dxf = "0\nSECTION\n2\nENTITIES\n";
