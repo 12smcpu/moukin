@@ -147,12 +147,12 @@ function render() {
         if (!item) return;
         ctx.strokeStyle = ctx.fillStyle = item.color;
         
-        // ★ここがポイント：画面上の見た目を「3px」に固定するために倍率で割る
+        // ★見た目の太さを固定 (画面上で約2.5px)
         ctx.lineWidth = 2.5 / view.scale; 
         
+        // スタンプの描画
         if (item.type && item.type.startsWith('stamp')) {
-            // ★スタンプの半径も「画面上で12px」程度の大きさに固定
-            const r = 12 / view.scale;
+            const r = 12 / view.scale; // 見た目の半径を固定
             ctx.beginPath();
             ctx.arc(item.x, item.y, r, 0, Math.PI * 2);
             if (item.type === 'stamp-dot') ctx.fill();
@@ -162,12 +162,15 @@ function render() {
                 ctx.arc(item.x, item.y, r * 0.6, 0, Math.PI * 2);
                 ctx.stroke();
             }
-        } else {
-            if (!item.points || item.points.length < 2) return;
+        } 
+        // ペンの描画
+        else if (item.points && item.points.length >= 2) {
             ctx.beginPath();
             ctx.lineCap = ctx.lineJoin = "round";
             ctx.moveTo(item.points[0].x, item.points[0].y);
-            item.points.forEach(pt => ctx.lineTo(pt.x, pt.y));
+            for (let i = 1; i < item.points.length; i++) {
+                ctx.lineTo(item.points[i].x, item.points[i].y);
+            }
             ctx.stroke();
         }
     };
@@ -175,7 +178,46 @@ function render() {
     allPaths.forEach(drawItem);
     if (currentPath) drawItem(currentPath);
     ctx.restore();
+
+    // 外枠
+    ctx.save();
+    ctx.translate(view.x, view.y);
+    ctx.scale(view.scale, view.scale);
+    ctx.translate(-A3_W / 2, -A3_H / 2);
+    ctx.strokeStyle = "rgba(0,0,0,0.15)";
+    ctx.lineWidth = 1 / view.scale;
+    ctx.strokeRect(0, 0, A3_W, A3_H);
+    ctx.restore();
 }
+
+// 操作イベント（ここもデータの持ち方をrenderと合わせて修正）
+canvas.addEventListener('pointerdown', e => {
+    lastPointers.push(e);
+    if (lastPointers.length > 1 || e.buttons === 2) {
+        isPanning = true; 
+        currentPath = null;
+    } else if (e.buttons === 1) {
+        const pt = toCanvas(e.clientX, e.clientY);
+        if (pt.x < 0 || pt.x > A3_W || pt.y < 0 || pt.y > A3_H) return;
+
+        if (mode.startsWith('stamp')) {
+            allPaths.push({ type: mode, x: pt.x, y: pt.y, color: currentColor });
+            render();
+        } else if (mode === 'draw') {
+            // ペンモードのデータ形式を確定
+            currentPath = { type: 'draw', points: [pt], color: currentColor };
+        } else if (mode === 'erase') {
+            allPaths = allPaths.filter(item => {
+                if (item.points) { // 線の場合
+                    return !item.points.some(p => Math.hypot(p.x-pt.x, p.y-pt.y) < 25/view.scale);
+                } else { // スタンプの場合
+                    return Math.hypot(item.x-pt.x, item.y-pt.y) > 25/view.scale;
+                }
+            });
+            render();
+        }
+    }
+});
 canvas.addEventListener('pointerdown', e => {
     lastPointers.push(e);
     if (lastPointers.length > 1 || e.buttons === 2) {
