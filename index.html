@@ -146,10 +146,12 @@ function render() {
     const drawItem = (item) => {
         if (!item) return;
         ctx.strokeStyle = ctx.fillStyle = item.color;
-        // スケールに応じて太さを変える（見た目の太さを固定）
+        
+        // ★ここがポイント：画面上の見た目を「3px」に固定するために倍率で割る
         ctx.lineWidth = 2.5 / view.scale; 
         
         if (item.type && item.type.startsWith('stamp')) {
+            // ★スタンプの半径も「画面上で12px」程度の大きさに固定
             const r = 12 / view.scale;
             ctx.beginPath();
             ctx.arc(item.x, item.y, r, 0, Math.PI * 2);
@@ -173,17 +175,7 @@ function render() {
     allPaths.forEach(drawItem);
     if (currentPath) drawItem(currentPath);
     ctx.restore();
-
-    ctx.save();
-    ctx.translate(view.x, view.y);
-    ctx.scale(view.scale, view.scale);
-    ctx.translate(-A3_W / 2, -A3_H / 2);
-    ctx.strokeStyle = "rgba(0,0,0,0.15)";
-    ctx.lineWidth = 1 / view.scale;
-    ctx.strokeRect(0, 0, A3_W, A3_H);
-    ctx.restore();
 }
-
 canvas.addEventListener('pointerdown', e => {
     lastPointers.push(e);
     if (lastPointers.length > 1 || e.buttons === 2) {
