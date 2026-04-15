@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>猛禽類調査 Pro - Print & Design Fix</title>
+    <title>猛禽類調査 Pro - Visual Fix</title>
     <style>
         :root { 
-            --bg-color: #dadce3; /* 落ち着いたダークグレー */
+            /* あなたが希望する明るいグレー */
+            --bg-color: #dadce3; 
             --ui-bg: rgba(255, 255, 255, 0.95); 
             --accent: #3498db; 
         }
@@ -18,7 +19,8 @@
         #toolbar { 
             position: fixed; top: 10px; left: 10px; z-index: 1000; background: var(--ui-bg); 
             padding: 12px; border-radius: 12px; display: flex; flex-direction: column; gap: 8px; 
-            box-shadow: 0 8px 20px rgba(0,0,0,0.3); width: 200px; max-height: 90vh; overflow-y: auto;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1); width: 200px; max-height: 90vh; overflow-y: auto;
+            border: 1px solid rgba(0,0,0,0.05);
         }
         .section-title { font-size: 10px; font-weight: bold; color: #2c3e50; border-left: 3px solid var(--accent); padding-left: 6px; }
         .btn-group { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -26,7 +28,7 @@
         button.active { background: var(--accent); color: white; border-color: var(--accent); }
         .color-btn { width: 28px; height: 28px; border-radius: 50%; border: 2px solid #fff; flex: none; }
         
-        #viewport { width: 100vw; height: 100vh; display: block; touch-action: none; }
+        #viewport { width: 100vw; height: 100vh; display: block; touch-action: none; background: transparent; }
 
         @media print {
             @page { size: A3 landscape; margin: 0; }
@@ -45,7 +47,7 @@
         <button onclick="document.getElementById('importFile').click()">開く</button>
         <input type="file" id="importFile" accept=".json" style="display:none" onchange="importProjectJSON(this)">
     </div>
-    <div class="section-title">MAP (A3)</div>
+    <div class="section-title">MAP (A3 CLIP)</div>
     <input type="file" id="mapInput" accept="image/*" style="font-size: 9px; width: 100%;">
     <button onclick="resetView()">全体表示</button>
     <div class="section-title">TOOLS</div>
@@ -85,10 +87,13 @@ function init() {
 
 function resize() {
     const dpr = window.devicePixelRatio || 1;
+    // 画面全体をカバーする論理ピクセル
     canvas.width = window.innerWidth * dpr;
     canvas.height = window.innerHeight * dpr;
     canvas.style.width = window.innerWidth + 'px';
     canvas.style.height = window.innerHeight + 'px';
+    // DPRに合わせてスケールを初期化
+    ctx.scale(dpr, dpr);
     render();
 }
 
@@ -105,26 +110,28 @@ function toCanvas(sx, sy) {
 function render() {
     const dpr = window.devicePixelRatio || 1;
     ctx.save();
+    // 1. 座標系をリセットして画面全体をご指定のグレーで塗りつぶす (残像を消す)
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    ctx.fillStyle = "#dadce3"; 
+    ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+    ctx.restore();
 
+    ctx.save();
+    // 2. 調査データの座標系（パン・ズーム）を適用
     ctx.translate(view.x, view.y);
     ctx.scale(view.scale, view.scale);
     ctx.translate(-A3_W / 2, -A3_H / 2);
 
-    // キャンバス背景(紙)
-    ctx.fillStyle = "#ffffff";
-    ctx.shadowBlur = 10;
-    ctx.shadowColor = "rgba(0,0,0,0.5)";
-    ctx.fillRect(0, 0, A3_W, A3_H);
-    ctx.shadowBlur = 0; // シャドウ解除
-    
-    // クリップして描画範囲を制限
+    // 3. A3の白い紙の範囲のみを描画対象にする
     ctx.beginPath();
     ctx.rect(0, 0, A3_W, A3_H);
-    ctx.clip();
+    ctx.clip(); // これより外は描画されない
 
-    // 地図
+    // 4. キャンバス背景(紙)
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, A3_W, A3_H);
+    
+    // 5. 地図描画（トリミング計算）
     if (mapImage.complete && mapImage.src) {
         const imgRatio = mapImage.width / mapImage.height;
         const canvasRatio = A3_W / A3_H;
@@ -139,7 +146,7 @@ function render() {
         ctx.drawImage(mapImage, sx, sy, sWidth, sHeight, 0, 0, A3_W, A3_H);
     }
 
-    // 線
+    // 6. 線描画
     const drawPath = (path) => {
         if (!path || path.points.length < 2) return;
         ctx.beginPath();
@@ -153,31 +160,21 @@ function render() {
     allPaths.forEach(drawPath);
     if (currentPath) drawPath(currentPath);
 
+    // 7. クリップ解除
+    ctx.restore();
+    
+    // 8. ガイド用の紙の境界線
+    ctx.save();
+    ctx.translate(view.x, view.y);
+    ctx.scale(view.scale, view.scale);
+    ctx.translate(-A3_W / 2, -A3_H / 2);
+    ctx.strokeStyle = "rgba(0,0,0,0.15)";
+    ctx.lineWidth = 1 / view.scale;
+    ctx.strokeRect(0, 0, A3_W, A3_H);
     ctx.restore();
 }
 
-// PDF出力 (プレビュー修正版)
-function exportPDF() {
-    const oldView = {...view};
-    // 印刷用の表示に強制切り替え
-    const padding = 0;
-    const scale = Math.min(window.innerWidth / A3_W, window.innerHeight / A3_H);
-    view.scale = scale;
-    view.x = window.innerWidth / 2;
-    view.y = window.innerHeight / 2;
-    
-    render();
-
-    // ブラウザの描画更新を待ってから印刷
-    setTimeout(() => {
-        window.print();
-        // 印刷後に元の表示に戻す
-        view = oldView;
-        render();
-    }, 500);
-}
-
-// タッチ・マウス操作
+//操作イベント（継承）
 canvas.addEventListener('pointerdown', e => {
     lastPointers.push(e);
     if (lastPointers.length > 1 || e.buttons === 2) {
@@ -209,7 +206,7 @@ window.addEventListener('pointermove', e => {
             currentPath.points.push(toCanvas(e.clientX, e.clientY));
         }
         lastPointers[idx] = e;
-        render();
+        render(); // 再描画
     }
 });
 
@@ -222,9 +219,10 @@ window.addEventListener('pointerup', e => {
     render();
 });
 
+// ファイル入出力など（継承）
 function resetView() {
     const padding = 40;
-    view.scale = Math.min((window.innerWidth-padding) / A3_W, (window.innerHeight-padding) / A3_H);
+    view.scale = Math.min((window.innerWidth-padding) / A3_W, (window.innerHeight-padding) / A3_H) * 0.9;
     view.x = window.innerWidth / 2;
     view.y = window.innerHeight / 2;
     render();
@@ -252,12 +250,22 @@ function importProjectJSON(input) {
     reader.readAsText(input.files[0]);
 }
 
+function exportPDF() {
+    const oldView = {...view};
+    const scale = Math.min(window.innerWidth / A3_W, window.innerHeight / A3_H);
+    view.scale = scale;
+    view.x = window.innerWidth / 2;
+    view.y = window.innerHeight / 2;
+    render();
+    setTimeout(() => { window.print(); view = oldView; render(); }, 300);
+}
+
 function exportDXF() {
     let dxf = "0\nSECTION\n2\nENTITIES\n";
     allPaths.forEach(path => {
         dxf += "0\nPOLYLINE\n8\nFlightPath\n62\n" + (path.color === 'red' ? 1 : 7) + "\n66\n1\n";
         path.points.forEach(pt => { dxf += `0\nVERTEX\n10\n${pt.x.toFixed(2)}\n20\n${-pt.y.toFixed(2)}\n`; });
-        dxf += "0\nSEQEND\n";
+        dxf += "0\ SEQEND\n";
     });
     dxf += "0\nENDSEC\n0\nEOF";
     const a = document.createElement('a');
@@ -279,6 +287,14 @@ function setMode(m) {
 }
 function undo() { allPaths.pop(); render(); }
 canvas.addEventListener('contextmenu', e => e.preventDefault());
+canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    const factor = Math.pow(0.999, e.deltaY);
+    view.x = e.clientX - (e.clientX - view.x) * factor;
+    view.y = e.clientY - (e.clientY - view.y) * factor;
+    view.scale *= factor;
+    render();
+}, { passive: false });
 init();
 </script>
 </body>
