@@ -146,10 +146,13 @@ function render() {
     const drawItem = (item) => {
         if (!item) return;
         ctx.strokeStyle = ctx.fillStyle = item.color;
-        ctx.lineWidth = 3 / view.scale;
         
-        if (item.type === 'stamp-circle' || item.type === 'stamp-dot' || item.type === 'stamp-double') {
-            const r = 15 / view.scale;
+        // ★ここがポイント：画面上の見た目を「3px」に固定するために倍率で割る
+        ctx.lineWidth = 2.5 / view.scale; 
+        
+        if (item.type && item.type.startsWith('stamp')) {
+            // ★スタンプの半径も「画面上で12px」程度の大きさに固定
+            const r = 12 / view.scale;
             ctx.beginPath();
             ctx.arc(item.x, item.y, r, 0, Math.PI * 2);
             if (item.type === 'stamp-dot') ctx.fill();
@@ -173,58 +176,6 @@ function render() {
     if (currentPath) drawItem(currentPath);
     ctx.restore();
 }
-
-canvas.addEventListener('pointerdown', e => {
-    lastPointers.push(e);
-    if (lastPointers.length > 1 || e.buttons === 2) {
-        isPanning = true; currentPath = null;
-    } else if (e.buttons === 1) {
-        const pt = toCanvas(e.clientX, e.clientY);
-        if (pt.x < 0 || pt.x > A3_W || pt.y < 0 || pt.y > A3_H) return;
-
-        if (mode.startsWith('stamp')) {
-            allPaths.push({ type: mode, x: pt.x, y: pt.y, color: currentColor });
-            render();
-        } else if (mode === 'draw') {
-            currentPath = { type: 'draw', points: [pt], color: currentColor };
-        } else if (mode === 'erase') {
-            allPaths = allPaths.filter(item => {
-                if (item.type === 'draw') return !item.points.some(p => Math.hypot(p.x-pt.x, p.y-pt.y) < 20/view.scale);
-                return Math.hypot(item.x-pt.x, item.y-pt.y) > 20/view.scale;
-            });
-            render();
-        }
-    }
-});
-
-window.addEventListener('pointermove', e => {
-    const idx = lastPointers.findIndex(p => p.pointerId === e.pointerId);
-    if (idx === -1) return;
-    const prev = lastPointers[idx];
-    if (isPanning) {
-        if (lastPointers.length === 2) {
-            const other = lastPointers[idx === 0 ? 1 : 0];
-            const oldDist = Math.hypot(prev.clientX - other.clientX, prev.clientY - other.clientY);
-            const newDist = Math.hypot(e.clientX - other.clientX, e.clientY - other.clientY);
-            view.scale *= (newDist / oldDist);
-        }
-        view.x += e.clientX - prev.clientX; view.y += e.clientY - prev.clientY;
-    } else if (currentPath) {
-        currentPath.points.push(toCanvas(e.clientX, e.clientY));
-    }
-    lastPointers[idx] = e;
-    render();
-});
-
-window.addEventListener('pointerup', e => {
-    lastPointers = lastPointers.filter(p => p.pointerId !== e.pointerId);
-    if (lastPointers.length === 0) {
-        if (currentPath) { allPaths.push(currentPath); currentPath = null; }
-        isPanning = false;
-    }
-    render();
-});
-
 function exportDXF() {
     let dxf = "0\nSECTION\n2\nENTITIES\n";
     const colorMap = { 'red': 1, 'blue': 5, 'purple': 6, 'green': 3, 'orange': 40, 'black': 7 };
