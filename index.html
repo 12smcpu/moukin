@@ -261,43 +261,24 @@ function exportPDF() {
 }
 
 function exportDXF() {
-    // AutoCADで認識されやすい色番号 (1:赤, 5:青, 6:マゼンタ, 3:緑, 40:オレンジ, 7:白/黒)
-    const colorMap = { 'red': 1, 'blue': 5, 'purple': 6, 'green': 3, 'orange': 40, 'black': 7 };
-
-    // 最小限の構成: ENTITIESセクションのみ
-    let dxf = "0\nSECTION\n2\nENTITIES\n";
-
+    let dxfContent = "0\nSECTION\n2\nENTITIES\n";
+    
     allPaths.forEach(path => {
-        if (!path || path.points.length < 2) return;
-        
-        const dxfColor = colorMap[path.color] || 7;
-
-        // 古典的なPOLYLINE形式（これが最も汎用性が高く、構造が単純です）
-        dxf += "0\nPOLYLINE\n";
-        dxf += "8\n0\n";        // 画層: 0番
-        dxf += "62\n" + dxfColor + "\n"; // 色
-        dxf += "66\n1\n";       // 頂点が続くフラグ
-        dxf += "70\n0\n";       // オープンポリライン
-
-        path.points.forEach(pt => {
-            dxf += "0\nVERTEX\n";
-            dxf += "8\n0\n";
-            dxf += "10\n" + pt.x.toFixed(4) + "\n"; // X
-            dxf += "20\n" + (A3_H - pt.y).toFixed(4) + "\n"; // Y (CADの座標系に合わせて反転)
-            dxf += "30\n0.0\n";    // Z
+        dxfContent += "0\nPOLYLINE\n8\nFlightPath\n66\n1\n";
+        path.forEach(pt => {
+            // Y軸はCADでは上方向が正のため反転させる
+            dxfContent += `0\nVERTEX\n8\nFlightPath\n10\n${pt.x}\n20\n${-pt.y}\n`;
         });
-
-        dxf += "0\nSEQEND\n"; // ポリラインの終点
+        dxfContent += "0\nSEQEND\n";
     });
+    
+    dxfContent += "0\nENDSEC\n0\nEOF";
 
-    dxf += "0\nENDSEC\n0\nEOF";
-
-    // ファイルの書き出し
-    const blob = new Blob([dxf], { type: 'text/plain' }); // AutoCADとの相性を考えplainで出す
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `Survey_${Date.now()}.dxf`;
-    a.click();
+    const blob = new Blob([dxfContent], {type: 'application/dxf'});
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = "flight_path.dxf";
+    link.click();
 }
 
 const colors = ['red', 'blue', 'purple', 'green', 'orange', 'black'];
