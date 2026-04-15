@@ -261,47 +261,42 @@ function exportPDF() {
 }
 
 function exportDXF() {
-    // 画層名と色の定義 (1:赤, 5:青, 6:マゼンタ, 3:緑, 40:オレンジ, 7:白/黒)
+    // AutoCADで認識されやすい色番号 (1:赤, 5:青, 6:マゼンタ, 3:緑, 40:オレンジ, 7:白/黒)
     const colorMap = { 'red': 1, 'blue': 5, 'purple': 6, 'green': 3, 'orange': 40, 'black': 7 };
 
-    let dxf = "0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1015\n0\nENDSEC\n"; // AutoCAD 2000形式
-    
-    // 画層の定義
-    dxf += "0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n70\n1\n";
-    dxf += "0\nLAYER\n2\nFlightPath\n70\n0\n62\n7\n6\nCONTINUOUS\n";
-    dxf += "0\nENDTAB\n0\nENDSEC\n";
-
-    // エンティティ（図形）の記述
-    dxf += "0\nSECTION\n2\nENTITIES\n";
+    // 最小限の構成: ENTITIESセクションのみ
+    let dxf = "0\nSECTION\n2\nENTITIES\n";
 
     allPaths.forEach(path => {
         if (!path || path.points.length < 2) return;
         
         const dxfColor = colorMap[path.color] || 7;
-        
-        dxf += "0\nLWPOLYLINE\n";
-        dxf += "5\n" + Math.floor(Math.random() * 100000).toString(16) + "\n"; // ハンドル（適当なID）
-        dxf += "100\nAcDbEntity\n";
-        dxf += "8\nFlightPath\n"; // 画層名
+
+        // 古典的なPOLYLINE形式（これが最も汎用性が高く、構造が単純です）
+        dxf += "0\nPOLYLINE\n";
+        dxf += "8\n0\n";        // 画層: 0番
         dxf += "62\n" + dxfColor + "\n"; // 色
-        dxf += "100\nAcDbPolyline\n";
-        dxf += "90\n" + path.points.length + "\n"; // 頂点数
-        dxf += "70\n0\n"; // 0:開いたポリライン, 1:閉じたポリライン
+        dxf += "66\n1\n";       // 頂点が続くフラグ
+        dxf += "70\n0\n";       // オープンポリライン
 
         path.points.forEach(pt => {
-            // A3の座標系をCADの座標系に変換
-            // CADは上方向がYプラスなので、キャンバスのY座標を反転させる
-            dxf += "10\n" + pt.x.toFixed(4) + "\n"; // X座標
-            dxf += "20\n" + (A3_H - pt.y).toFixed(4) + "\n"; // Y座標
+            dxf += "0\nVERTEX\n";
+            dxf += "8\n0\n";
+            dxf += "10\n" + pt.x.toFixed(4) + "\n"; // X
+            dxf += "20\n" + (A3_H - pt.y).toFixed(4) + "\n"; // Y (CADの座標系に合わせて反転)
+            dxf += "30\n0.0\n";    // Z
         });
+
+        dxf += "0\nSEQEND\n"; // ポリラインの終点
     });
 
     dxf += "0\nENDSEC\n0\nEOF";
 
-    const blob = new Blob([dxf], { type: 'application/dxf' });
+    // ファイルの書き出し
+    const blob = new Blob([dxf], { type: 'text/plain' }); // AutoCADとの相性を考えplainで出す
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `SurveyLines_${Date.now()}.dxf`;
+    a.download = `Survey_${Date.now()}.dxf`;
     a.click();
 }
 
