@@ -293,15 +293,31 @@ function exportDXF() {
 }
 
 function exportPDFWithWindow() {
-    if (!windowRect || windowRect.w < 10) { alert("「窓(印刷)」ボタンを選択し、印刷したい範囲をドラッグで囲ってください。"); return; }
-    const sc = Math.min(window.innerWidth / windowRect.w, window.innerHeight / windowRect.h);
-    view.scale = sc;
-    view.x = window.innerWidth / 2 - (windowRect.x + windowRect.w/2 - A3_W/2) * sc;
-    view.y = window.innerHeight / 2 - (windowRect.y + windowRect.h/2 - A3_H/2) * sc;
-    render();
-    setTimeout(() => { window.print(); }, 500);
-}
+    if (!windowRect || windowRect.w < 5 || windowRect.h < 5) {
+        alert("「窓(印刷)」ボタンを選択し、印刷したい範囲をマウスで囲ってください。");
+        return;
+    }
 
+    // 1. 窓のサイズに合わせて倍率（scale）を計算
+    const scaleX = window.innerWidth / windowRect.w;
+    const scaleY = window.innerHeight / windowRect.h;
+    const sc = Math.min(scaleX, scaleY);
+
+    view.scale = sc;
+
+    // 2. 【最重要】窓の左上(windowRect.x, y)を、キャンバスの左上(0,0)に一致させる計算
+    // A3の中心(A3_W/2)からの相対位置を逆算して、view.x, y をセットします
+    view.x = (A3_W / 2 - windowRect.x) * sc;
+    view.y = (A3_H / 2 - windowRect.y) * sc;
+
+    // 3. 描画を更新
+    render();
+
+    // 4. ブラウザが描画を反映するのを少し待ってから印刷
+    setTimeout(() => {
+        window.print();
+    }, 500);
+}
 function exportProjectJSON() {
     const fn = askFilename("project");
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({map:mapImage.src, paths:allPaths})], {type:"application/json"}));
