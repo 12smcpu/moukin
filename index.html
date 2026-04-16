@@ -147,9 +147,9 @@ function render() {
     const drawItem = (item) => {
         if (!item) return;
         ctx.strokeStyle = ctx.fillStyle = item.color;
-        ctx.lineWidth = 1; // 修正後の太さ
+        ctx.lineWidth = 1; 
         if (item.type && item.type.startsWith('stamp')) {
-            const r = 7; // 修正後の半径
+            const r = 7; 
             ctx.beginPath(); ctx.arc(item.x, item.y, r, 0, Math.PI*2);
             item.type === 'stamp-dot' ? ctx.fill() : ctx.stroke();
             if (item.type === 'stamp-double') {
@@ -165,14 +165,17 @@ function render() {
 
     allPaths.forEach(drawItem);
     if (currentPath) drawItem(currentPath);
-    // --- ここから追加：スタンプのプレビュー表示 ---
-    // スタンプモードかつ、マウスを動かしている最中で、パン（画面移動）していない時
+
+    // --- スタンプのプレビュー表示 ---
     if (mode.startsWith('stamp') && lastPointers.length > 0 && !isPanning) {
-        const p = toCanvas(lastPointers[0].clientX, lastPointers[0].clientY);
-        // 紙の範囲内（0〜A3サイズ）にマウスがある時だけ表示
+        // 最新のポインタ位置（配列の最後）を取得
+        const latestPointer = lastPointers[lastPointers.length - 1];
+        const p = toCanvas(latestPointer.clientX, latestPointer.clientY);
+        
+        // 紙の範囲内だけ表示
         if (p.x >= 0 && p.x <= A3_W && p.y >= 0 && p.y <= A3_H) {
             ctx.save();
-            ctx.globalAlpha = 0.5; // 半透明にする
+            ctx.globalAlpha = 0.5; // 半透明
             ctx.strokeStyle = ctx.fillStyle = currentColor;
             const r = 7;
             ctx.beginPath();
@@ -182,15 +185,14 @@ function render() {
             } else {
                 ctx.stroke();
                 if (mode === 'stamp-double') {
-                    ctx.beginPath();
-                    ctx.arc(p.x, p.y, r * 0.6, 0, Math.PI * 2);
-                    ctx.stroke();
+                    ctx.beginPath(); ctx.arc(p.x, p.y, r * 0.6, 0, Math.PI * 2); ctx.stroke();
                 }
             }
             ctx.restore();
         }
     }
-    // --- ここまで追加 ---
+    // --- プレビューここまで ---
+
     ctx.restore(); // クリップ終了
 
     // 窓のプレビュー
@@ -203,6 +205,10 @@ function render() {
     }
     ctx.restore();
 }
+
+// ----------------------------------------------------
+// イベントリスナー部分（ここも上書き推奨です）
+// ----------------------------------------------------
 
 canvas.addEventListener('pointerdown', e => {
     lastPointers.push(e);
@@ -235,29 +241,28 @@ canvas.addEventListener('pointerdown', e => {
 window.addEventListener('pointermove', e => {
     const idx = lastPointers.findIndex(p => p.pointerId === e.pointerId);
     if (idx === -1) return;
+
+    // ★重要：先に情報を更新して、renderが最新の位置を把握できるようにする
+    lastPointers[idx] = e;
     const pt = toCanvas(e.clientX, e.clientY);
 
     if (isPanning) {
         if (lastPointers.length > 1) {
             const p1 = lastPointers[0], p2 = lastPointers[1];
             const oldD = Math.hypot(p1.clientX - p2.clientX, p1.clientY - p2.clientY);
-            lastPointers[idx] = e;
             const newD = Math.hypot(lastPointers[0].clientX - lastPointers[1].clientX, lastPointers[0].clientY - lastPointers[1].clientY);
             if (oldD > 0) view.scale *= (newD / oldD);
         }
-        view.x += e.clientX - lastPointers[idx].clientX;
-        view.y += e.clientY - lastPointers[idx].clientY;
+        // idxを使用して移動量を計算（lastPointers[idx]は既に更新済みなので、e.movementなどは使わず直接差分を見る）
+        // ※以前の動作を優先し、シンプルにrenderを呼ぶ形にしています
+        view.x += e.movementX; 
+        view.y += e.movementY;
     } else if (mode === 'window' && windowStart) {
         windowRect = { x: Math.min(windowStart.x, pt.x), y: Math.min(windowStart.y, pt.y), w: Math.abs(pt.x - windowStart.x), h: Math.abs(pt.y - windowStart.y) };
     } else if (currentPath) {
         currentPath.points.push(pt);
     }
-    else if (mode.startsWith('stamp')) {
-        // スタンプモードの時は、動かすたびに下の render() を実行させるために
-        // ここには何も書かなくてOKです（下の render() が勝手にプレビューを動かします）
-    }
-    // -----------------
-    lastPointers[idx] = e;
+    // スタンプモード時もこのあとのrender()でプレビューが動く
     
     render();
 });
