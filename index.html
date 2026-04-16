@@ -167,9 +167,8 @@ function render() {
     if (currentPath) drawItem(currentPath);
 
     // --- スタンプのプレビュー表示 ---
-    if (mode.startsWith('stamp') && lastPointers.length > 0 && !isPanning) {
-        // 最新のポインタ位置（配列の最後）を取得
-        const latestPointer = lastPointers[lastPointers.length - 1];
+if (mode.startsWith('stamp') && lastPointers.length > 0 && !isPanning) {
+        const latestPointer = lastPointers[0]; // 常に最新の位置を参照
         const p = toCanvas(latestPointer.clientX, latestPointer.clientY);
         
         // 紙の範囲内だけ表示
@@ -239,11 +238,16 @@ canvas.addEventListener('pointerdown', e => {
 });
 
 window.addEventListener('pointermove', e => {
-    const idx = lastPointers.findIndex(p => p.pointerId === e.pointerId);
-    if (idx === -1) return;
+    // 【ここを追加】マウスの現在位置を常に「最新の1番目」として仮保存しておく
+    if (lastPointers.length === 0) {
+        lastPointers[0] = e; 
+    }
 
-    // ★重要：先に情報を更新して、renderが最新の位置を把握できるようにする
-    lastPointers[idx] = e;
+    const idx = lastPointers.findIndex(p => p.pointerId === e.pointerId);
+    if (idx !== -1) {
+        lastPointers[idx] = e;
+    }
+
     const pt = toCanvas(e.clientX, e.clientY);
 
     if (isPanning) {
