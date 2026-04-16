@@ -355,7 +355,7 @@ function exportImageWithWindow() {
         octx.lineWidth = 2; 
         
         if (item.type && item.type.startsWith('stamp')) {
-            const r = 14; // スタンプ半径も大きく調整
+            const r = 7; 
             octx.beginPath(); octx.arc(item.x, item.y, r, 0, Math.PI*2);
             item.type === 'stamp-dot' ? octx.fill() : octx.stroke();
             if (item.type === 'stamp-double') {
