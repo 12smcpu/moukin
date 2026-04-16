@@ -121,153 +121,69 @@ function toCanvas(sx, sy) {
     };
 }
 
-function render() {
-    const dpr = window.devicePixelRatio || 1;
-    ctx.save();
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = "#dadce3"; ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
-    ctx.restore();
+window.addEventListener('pointermove', e => {
+    // 常に最新のマウス位置をプレビュー用に保存
+    window.currentPointer = e;
 
-    ctx.save();
-    ctx.translate(view.x, view.y);
-    ctx.scale(view.scale, view.scale);
-    ctx.translate(-A3_W/2, -A3_H/2);
-
-    // 紙とクリッピング
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(0, 0, A3_W, A3_H);
-    ctx.save();
-    ctx.beginPath(); ctx.rect(0, 0, A3_W, A3_H); ctx.clip();
-
-    if (mapImage.complete && mapImage.naturalWidth > 0) {
-        const s = Math.min(A3_W/mapImage.naturalWidth, A3_H/mapImage.naturalHeight);
-        ctx.drawImage(mapImage, (A3_W-mapImage.naturalWidth*s)/2, (A3_H-mapImage.naturalHeight*s)/2, mapImage.naturalWidth*s, mapImage.naturalHeight*s);
-    }
-
-    const drawItem = (item) => {
-        if (!item) return;
-        ctx.strokeStyle = ctx.fillStyle = item.color;
-        ctx.lineWidth = 1; 
-        if (item.type && item.type.startsWith('stamp')) {
-            const r = 7; 
-            ctx.beginPath(); ctx.arc(item.x, item.y, r, 0, Math.PI*2);
-            item.type === 'stamp-dot' ? ctx.fill() : ctx.stroke();
-            if (item.type === 'stamp-double') {
-                ctx.beginPath(); ctx.arc(item.x, item.y, r*0.6, 0, Math.PI*2); ctx.stroke();
-            }
-        } else if (item.points) {
-            ctx.beginPath(); ctx.lineCap = ctx.lineJoin = "round";
-            ctx.moveTo(item.points[0].x, item.points[0].y);
-            item.points.forEach(p => ctx.lineTo(p.x, p.y));
-            ctx.stroke();
-        }
-    };
-
-    allPaths.forEach(drawItem);
-    if (currentPath) drawItem(currentPath);
-
-    // --- スタンプのプレビュー表示 ---
-if (mode.startsWith('stamp') && lastPointers.length > 0 && !isPanning) {
-        const latestPointer = lastPointers[0]; // 常に最新の位置を参照
-        const p = toCanvas(latestPointer.clientX, latestPointer.clientY);
-        
-        // 紙の範囲内だけ表示
-        if (p.x >= 0 && p.x <= A3_W && p.y >= 0 && p.y <= A3_H) {
-            ctx.save();
-            ctx.globalAlpha = 0.5; // 半透明
-            ctx.strokeStyle = ctx.fillStyle = currentColor;
-            const r = 7;
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
-            if (mode === 'stamp-dot') {
-                ctx.fill();
-            } else {
-                ctx.stroke();
-                if (mode === 'stamp-double') {
-                    ctx.beginPath(); ctx.arc(p.x, p.y, r * 0.6, 0, Math.PI * 2); ctx.stroke();
-                }
-            }
-            ctx.restore();
-        }
-    }
-    // --- プレビューここまで ---
-
-    ctx.restore(); // クリップ終了
-
-    // 窓のプレビュー
-    if (mode === 'window' && windowRect) {
-        ctx.strokeStyle = "rgba(52, 152, 219, 0.8)";
-        ctx.lineWidth = 2;
-        ctx.setLineDash([5, 5]);
-        ctx.strokeRect(windowRect.x, windowRect.y, windowRect.w, windowRect.h);
-        ctx.setLineDash([]);
-    }
-    ctx.restore();
-}
-
-// ----------------------------------------------------
-// イベントリスナー部分（ここも上書き推奨です）
-// ----------------------------------------------------
-
-canvas.addEventListener('pointerdown', e => {
-    lastPointers.push(e);
+    const idx = lastPointers.findIndex(p => p.pointerId === e.pointerId);
     const pt = toCanvas(e.clientX, e.clientY);
 
-    if (e.button === 2 || lastPointers.length > 1) {
-        isPanning = true; return;
+    // クリック中（ドラッグ中）の処理
+    if (idx !== -1) {
+        const oldPointer = lastPointers[idx];
+        lastPointers[idx] = e; // 情報を更新
+
+        if (isPanning) {
+            if (lastPointers.length > 1) {
+                const p1 = lastPointers[0], p2 = lastPointers[1];
+                const oldD = Math.hypot(p1.clientX - p2.clientX, p1.clientY - p2.clientY);
+                const newD = Math.hypot(lastPointers[0].clientX - lastPointers[1].clientX, lastPointers[0].clientY - lastPointers[1].clientY);
+                if (oldD > 0) view.scale *= (newD / oldD);
+            }
+            // 直前の位置との差分で移動（movementXが不安定なブラウザでも動く書き方）
+            view.x += e.clientX - oldPointer.clientX;
+            view.y += e.clientY - oldPointer.clientY;
+        } else if (mode === 'window' && windowStart) {
+            windowRect = { x: Math.min(windowStart.x, pt.x), y: Math.min(windowStart.y, pt.y), w: Math.abs(pt.x - windowStart.x), h: Math.abs(pt.y - windowStart.y) };
+        } else if (currentPath) {
+            currentPath.points.push(pt);
+        }
     }
     
-    if (mode === 'window') {
-        windowStart = pt; return;
-    }
-
-    if (pt.x < 0 || pt.x > A3_W || pt.y < 0 || pt.y > A3_H) return;
-
-    if (mode.startsWith('stamp')) {
-        allPaths.push({type: mode, x: pt.x, y: pt.y, color: currentColor});
-        render();
-    } else if (mode === 'draw') {
-        currentPath = {points: [pt], color: currentColor};
-    } else if (mode === 'erase') {
-        allPaths = allPaths.filter(i => {
-            const dist = i.points ? i.points.some(p => Math.hypot(p.x-pt.x, p.y-pt.y) < 20/view.scale) : Math.hypot(i.x-pt.x, i.y-pt.y) < 20/view.scale;
-            return !dist;
-        });
-        render();
-    }
+    // ニュートラルな動きでも、プレビューを動かすために再描画
+    render();
 });
 
 window.addEventListener('pointermove', e => {
-    // 【ここを追加】マウスの現在位置を常に「最新の1番目」として仮保存しておく
-    if (lastPointers.length === 0) {
-        lastPointers[0] = e; 
-    }
+    // 常に最新のマウス位置をプレビュー用に保存
+    window.currentPointer = e;
 
     const idx = lastPointers.findIndex(p => p.pointerId === e.pointerId);
-    if (idx !== -1) {
-        lastPointers[idx] = e;
-    }
-
     const pt = toCanvas(e.clientX, e.clientY);
 
-    if (isPanning) {
-        if (lastPointers.length > 1) {
-            const p1 = lastPointers[0], p2 = lastPointers[1];
-            const oldD = Math.hypot(p1.clientX - p2.clientX, p1.clientY - p2.clientY);
-            const newD = Math.hypot(lastPointers[0].clientX - lastPointers[1].clientX, lastPointers[0].clientY - lastPointers[1].clientY);
-            if (oldD > 0) view.scale *= (newD / oldD);
+    // クリック中（ドラッグ中）の処理
+    if (idx !== -1) {
+        const oldPointer = lastPointers[idx];
+        lastPointers[idx] = e; // 情報を更新
+
+        if (isPanning) {
+            if (lastPointers.length > 1) {
+                const p1 = lastPointers[0], p2 = lastPointers[1];
+                const oldD = Math.hypot(p1.clientX - p2.clientX, p1.clientY - p2.clientY);
+                const newD = Math.hypot(lastPointers[0].clientX - lastPointers[1].clientX, lastPointers[0].clientY - lastPointers[1].clientY);
+                if (oldD > 0) view.scale *= (newD / oldD);
+            }
+            // 直前の位置との差分で移動（movementXが不安定なブラウザでも動く書き方）
+            view.x += e.clientX - oldPointer.clientX;
+            view.y += e.clientY - oldPointer.clientY;
+        } else if (mode === 'window' && windowStart) {
+            windowRect = { x: Math.min(windowStart.x, pt.x), y: Math.min(windowStart.y, pt.y), w: Math.abs(pt.x - windowStart.x), h: Math.abs(pt.y - windowStart.y) };
+        } else if (currentPath) {
+            currentPath.points.push(pt);
         }
-        // idxを使用して移動量を計算（lastPointers[idx]は既に更新済みなので、e.movementなどは使わず直接差分を見る）
-        // ※以前の動作を優先し、シンプルにrenderを呼ぶ形にしています
-        view.x += e.movementX; 
-        view.y += e.movementY;
-    } else if (mode === 'window' && windowStart) {
-        windowRect = { x: Math.min(windowStart.x, pt.x), y: Math.min(windowStart.y, pt.y), w: Math.abs(pt.x - windowStart.x), h: Math.abs(pt.y - windowStart.y) };
-    } else if (currentPath) {
-        currentPath.points.push(pt);
     }
-    // スタンプモード時もこのあとのrender()でプレビューが動く
     
+    // ニュートラルな動きでも、プレビューを動かすために再描画
     render();
 });
 
