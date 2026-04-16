@@ -298,27 +298,30 @@ function exportPDFWithWindow() {
         return;
     }
 
-    // 1. ウィンドウのサイズ（印刷対象の解像度）を取得
-    const winW = window.innerWidth;
-    const winH = window.innerHeight;
+    // A3の縦横比に合わせる
+    const A3_RATIO = A3_W / A3_H;
+    let targetW = windowRect.w;
+    let targetH = windowRect.h;
 
-    // 2. 窓の比率とウィンドウの比率を比較して、隙間が出ない方の倍率を採用する
-    // Math.max を使うことで、画面を「はみ出すくらい一杯に」広げます
-    const sc = Math.max(winW / windowRect.w, winH / windowRect.h);
+    if (targetW / targetH > A3_RATIO) {
+        targetH = targetW / A3_RATIO;
+    } else {
+        targetW = targetH * A3_RATIO;
+    }
 
+    // ウィンドウサイズに合わせてスケーリング
+    const sc = Math.min(window.innerWidth / targetW, window.innerHeight / targetH);
     view.scale = sc;
 
-    // 3. 窓の左上を (0,0) に固定
+    // 窓の「左上」を画面の「左上」に一致させる（白い被りを防ぐための座標固定）
     view.x = (A3_W / 2 - windowRect.x) * sc;
     view.y = (A3_H / 2 - windowRect.y) * sc;
 
-    // 4. 背景のグレーを一時的に「白」に変えて余白を目立たなくする
-    // (render関数内で背景色を塗っている場合は、ここでフラグを立てるか強制塗りつぶし)
-    const oldFill = ctx.fillStyle;
-    
-    render();
+    // --- ここで重要な描画の強制リセット ---
+    ctx.clearRect(0, 0, canvas.width, canvas.height); // キャンバスを一度完全にクリア
+    render(); // 背景白から順に再描画
 
-    // 5. 印刷実行
+    // 印刷
     setTimeout(() => {
         window.print();
     }, 500);
