@@ -291,14 +291,20 @@ function exportDXF() {
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([d+"0\nENDSEC\n0\nEOF"], {type:"application/dxf"}));
     a.download = fn + ".dxf"; a.click();
 }
-
+function undo() {
+    if (allPaths.length > 0) {
+        allPaths.pop(); // 最後の描画データを取り除く
+        render();       // 画面を再描画して反映させる
+    }
+}
+// --- PDF出力（窓機能）の最終修正 ---
 function exportPDFWithWindow() {
     if (!windowRect || windowRect.w < 5 || windowRect.h < 5) {
         alert("「窓(印刷)」ボタンを選択し、印刷したい範囲をマウスで囲ってください。");
         return;
     }
 
-    // A3の縦横比に合わせる
+    // 1. A3の比率に合わせたターゲットサイズを計算
     const A3_RATIO = A3_W / A3_H;
     let targetW = windowRect.w;
     let targetH = windowRect.h;
@@ -309,19 +315,23 @@ function exportPDFWithWindow() {
         targetW = targetH * A3_RATIO;
     }
 
-    // ウィンドウサイズに合わせてスケーリング
+    // 2. 倍率の決定
     const sc = Math.min(window.innerWidth / targetW, window.innerHeight / targetH);
     view.scale = sc;
 
-    // 窓の「左上」を画面の「左上」に一致させる（白い被りを防ぐための座標固定）
-    view.x = (A3_W / 2 - windowRect.x) * sc;
-    view.y = (A3_H / 2 - windowRect.y) * sc;
+    // 3. 【重要】座標の再計算
+    // 窓の中心が画面の中央に来るように配置することで、白い「紙」とのズレをなくします
+    const centerX = windowRect.x + windowRect.w / 2;
+    const centerY = windowRect.y + windowRect.h / 2;
+    
+    view.x = window.innerWidth / 2 - (centerX - A3_W / 2) * sc;
+    view.y = window.innerHeight / 2 - (centerY - A3_H / 2) * sc;
 
-    // --- ここで重要な描画の強制リセット ---
-    ctx.clearRect(0, 0, canvas.width, canvas.height); // キャンバスを一度完全にクリア
-    render(); // 背景白から順に再描画
+    // 4. キャンバスを一度クリアして、正しい順序で再描画
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    render();
 
-    // 印刷
+    // 5. 印刷実行
     setTimeout(() => {
         window.print();
     }, 500);
