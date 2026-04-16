@@ -165,6 +165,32 @@ function render() {
 
     allPaths.forEach(drawItem);
     if (currentPath) drawItem(currentPath);
+    // --- ここから追加：スタンプのプレビュー表示 ---
+    // スタンプモードかつ、マウスを動かしている最中で、パン（画面移動）していない時
+    if (mode.startsWith('stamp') && lastPointers.length > 0 && !isPanning) {
+        const p = toCanvas(lastPointers[0].clientX, lastPointers[0].clientY);
+        // 紙の範囲内（0〜A3サイズ）にマウスがある時だけ表示
+        if (p.x >= 0 && p.x <= A3_W && p.y >= 0 && p.y <= A3_H) {
+            ctx.save();
+            ctx.globalAlpha = 0.5; // 半透明にする
+            ctx.strokeStyle = ctx.fillStyle = currentColor;
+            const r = 7;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+            if (mode === 'stamp-dot') {
+                ctx.fill();
+            } else {
+                ctx.stroke();
+                if (mode === 'stamp-double') {
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, r * 0.6, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+            }
+            ctx.restore();
+        }
+    }
+    // --- ここまで追加 ---
     ctx.restore(); // クリップ終了
 
     // 窓のプレビュー
