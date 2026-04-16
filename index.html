@@ -128,9 +128,9 @@ function render() {
     const drawItem = (item) => {
         if (!item) return;
         ctx.strokeStyle = ctx.fillStyle = item.color;
-        ctx.lineWidth = 3; // 固定
+        ctx.lineWidth = 1; // 固定
         if (item.type && item.type.startsWith('stamp')) {
-            const r = 15; // 固定
+            const r = 7; // 固定
             ctx.beginPath(); ctx.arc(item.x, item.y, r, 0, Math.PI*2);
             item.type === 'stamp-dot' ? ctx.fill() : ctx.stroke();
             if (item.type === 'stamp-double') {
