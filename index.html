@@ -4,26 +4,67 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>猛禽類調査 Pro - Enhanced</title>
-    <style>
-        :root { --accent: #3498db; }
-        body { margin: 0; overflow: hidden; background: #dadce3; font-family: sans-serif; position: fixed; width: 100%; height: 100%; touch-action: none; }
+   <style>
+    /* --- 既存のスタイル --- */
+    :root { --accent: #3498db; }
+    body { margin: 0; overflow: hidden; background: #dadce3; font-family: sans-serif; position: fixed; width: 100%; height: 100%; touch-action: none; }
+    
+    #toolbar { 
+        position: fixed; top: 10px; left: 10px; z-index: 1000; background: rgba(255,255,255,0.95); 
+        padding: 10px; border-radius: 12px; display: flex; flex-direction: column; gap: 6px; 
+        box-shadow: 0 4px 15px rgba(0,0,0,0.15); width: 180px; max-height: 90vh; overflow-y: auto;
+    }
+    /* --- [追加] 印刷専用のスタイル --- */
+    @media print {
+        /* ツールバーを隠す */
+        #toolbar { display: none !important; }
         
-        #toolbar { 
-            position: fixed; top: 10px; left: 10px; z-index: 1000; background: rgba(255,255,255,0.95); 
-            padding: 10px; border-radius: 12px; display: flex; flex-direction: column; gap: 6px; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.15); width: 180px; max-height: 90vh; overflow-y: auto;
+        /* 背景を白くし、固定解除 */
+        body { background: white !important; position: static !important; overflow: visible !important; }
+        
+        /* キャンバスだけを左上に表示 */
+        #viewport { 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            width: 100% !important; 
+            height: auto !important; 
         }
-        .section-title { font-size: 10px; font-weight: bold; border-left: 3px solid var(--accent); padding-left: 5px; margin-top: 5px; }
-        .btn-group { display: flex; flex-wrap: wrap; gap: 4px; }
-        
-        button { padding: 8px 4px; cursor: pointer; border: 1px solid #ddd; background: #fff; border-radius: 6px; font-size: 11px; flex: 1; min-width: 40px; }
-        button.active { background: var(--accent); color: white; border-color: var(--accent); }
-        
-        .color-btn { width: 30px; height: 30px; border-radius: 50%; border: 2px solid transparent; flex: none; cursor: pointer; box-sizing: border-box; }
-        .color-btn.selected { border: 2px solid #fff; box-shadow: 0 0 0 2px var(--accent); transform: scale(1.1); }
 
-        canvas { display: block; background: transparent; cursor: crosshair; }
-    </style>
+        /* ブラウザのヘッダー・フッター（日付など）を消す設定 */
+        @page { margin: 0; size: A3 landscape; }
+    }
+    
+    /* ボタンなどの見た目（継続） */
+    .section-title { font-size: 10px; font-weight: bold; border-left: 3px solid var(--accent); padding-left: 5px; margin-top: 5px; }
+    .btn-group { display: flex; flex-wrap: wrap; gap: 4px; }
+    button { padding: 8px 4px; cursor: pointer; border: 1px solid #ddd; background: #fff; border-radius: 6px; font-size: 11px; flex: 1; min-width: 40px; }
+    button.active { background: var(--accent); color: white; border-color: var(--accent); }
+    .color-btn { width: 30px; height: 30px; border-radius: 50%; border: 2px solid transparent; flex: none; cursor: pointer; box-sizing: border-box; }
+    .color-btn.selected { border: 2px solid #fff; box-shadow: 0 0 0 2px var(--accent); transform: scale(1.1); }
+    canvas { display: block; background: transparent; cursor: crosshair; }
+</style>
+
+<script>
+// --- 中略 (init, renderなどはそのまま) ---
+
+// [修正] PDF書き出し用の関数
+function prepareAndPrint() {
+    // 1. 全体表示にリセット（A3枠が画面に収まるようにする）
+    resetView();
+    
+    // 2. 描画を強制実行
+    render();
+    
+    // 3. 少し待ってから印刷ダイアログを開く（レンダリング時間を確保）
+    setTimeout(() => {
+        window.print();
+    }, 500);
+}
+
+// HTML内のボタンのonclickを以下に書き換えてください
+// <button onclick="prepareAndPrint()" style="color:var(--accent);">PDF</button>
+</script>
 </head>
 <body>
 
@@ -115,22 +156,28 @@ function render() {
     ctx.scale(view.scale, view.scale);
     ctx.translate(-A3_W/2, -A3_H/2);
 
-    // 紙
+    // 1. 紙の描画（土台）
     ctx.fillStyle = "#fff";
     ctx.fillRect(0, 0, A3_W, A3_H);
+
+    // ★追加：クリッピング（これ以降の描画をA3の範囲内に制限する）
+    ctx.beginPath();
+    ctx.rect(0, 0, A3_W, A3_H);
+    ctx.clip(); 
     
-    // 画像
+    // 2. 地図画像の描画
     if (mapImage.complete && mapImage.naturalWidth > 0) {
         const s = Math.min(A3_W/mapImage.naturalWidth, A3_H/mapImage.naturalHeight);
         ctx.drawImage(mapImage, (A3_W-mapImage.naturalWidth*s)/2, (A3_H-mapImage.naturalHeight*s)/2, mapImage.naturalWidth*s, mapImage.naturalHeight*s);
     }
 
+    // 3. ペンやスタンプの描画
     const drawItem = (item) => {
         if (!item) return;
         ctx.strokeStyle = ctx.fillStyle = item.color;
-        ctx.lineWidth = 1; // 固定
+        ctx.lineWidth = 1;
         if (item.type && item.type.startsWith('stamp')) {
-            const r = 7; // 固定
+            const r = 7;
             ctx.beginPath(); ctx.arc(item.x, item.y, r, 0, Math.PI*2);
             item.type === 'stamp-dot' ? ctx.fill() : ctx.stroke();
             if (item.type === 'stamp-double') {
@@ -146,7 +193,8 @@ function render() {
 
     allPaths.forEach(drawItem);
     if (currentPath) drawItem(currentPath);
-    ctx.restore();
+
+    ctx.restore(); // クリッピング解除
 }
 
 // ポインター操作
