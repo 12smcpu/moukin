@@ -252,6 +252,11 @@ window.addEventListener('pointermove', e => {
     } else if (currentPath) {
         currentPath.points.push(pt);
     }
+    else if (mode.startsWith('stamp')) {
+        // スタンプモードの時は、動かすたびに下の render() を実行させるために
+        // ここには何も書かなくてOKです（下の render() が勝手にプレビューを動かします）
+    }
+    // -----------------
     lastPointers[idx] = e;
     render();
 });
