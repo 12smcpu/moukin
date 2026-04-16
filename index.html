@@ -297,46 +297,54 @@ function undo() {
         render();       // 画面を再描画して反映させる
     }
 }
-function exportPDFWithWindow() {
-    if (!windowRect || windowRect.w < 5 || windowRect.h < 5) {
-        alert("窓で範囲を囲ってください");
-        return;
+function exportImageWithWindow() {
+    if (!windowRect || windowRect.w < 5) { alert("範囲を囲ってください"); return; }
+
+    // 1. 完璧なA3サイズの「隠しキャンバス」を作る
+    const offCanvas = document.createElement('canvas');
+    offCanvas.width = 1587; 
+    offCanvas.height = 1123;
+    const octx = offCanvas.getContext('2d');
+
+    // 2. 白い背景を塗る
+    octx.fillStyle = "white";
+    octx.fillRect(0, 0, 1587, 1123);
+
+    // 3. 窓の範囲がA3に収まるようにスケール計算
+    const sc = Math.min(1587 / windowRect.w, 1123 / windowRect.h);
+
+    // 4. 窓の範囲をオフスクリーンキャンバスに転写する
+    octx.save();
+    octx.scale(sc, sc);
+    octx.translate(-windowRect.x, -windowRect.y);
+
+    // 地図の描画
+    if (mapImage.complete) {
+        const s = Math.min(A3_W/mapImage.naturalWidth, A3_H/mapImage.naturalHeight);
+        octx.drawImage(mapImage, (A3_W-mapImage.naturalWidth*s)/2, (A3_H-mapImage.naturalHeight*s)/2, mapImage.naturalWidth*s, mapImage.naturalHeight*s);
     }
 
-    // 1. 印刷用の倍率と位置を計算（ここは今まで通り）
-    const A3_RATIO = 1587 / 1123;
-    let targetW = windowRect.w, targetH = windowRect.h;
-    if (targetW / targetH > A3_RATIO) targetH = targetW / A3_RATIO;
-    else targetW = targetH * A3_RATIO;
+    // パスとスタンプの描画（allPathsをループ）
+    allPaths.forEach(item => {
+        octx.strokeStyle = octx.fillStyle = item.color;
+        octx.lineWidth = 1;
+        if (item.type && item.type.startsWith('stamp')) {
+            octx.beginPath(); octx.arc(item.x, item.y, 7, 0, Math.PI*2);
+            item.type === 'stamp-dot' ? octx.fill() : octx.stroke();
+        } else if (item.points) {
+            octx.beginPath(); octx.moveTo(item.points[0].x, item.points[0].y);
+            item.points.forEach(p => octx.lineTo(p.x, p.y));
+            octx.stroke();
+        }
+    });
+    octx.restore();
 
-    const sc = Math.min(window.innerWidth / targetW, window.innerHeight / targetH);
-    
-    // 状態を一時保存
-    const oldView = { ...view };
-    
-    // 座標をセット
-    view.scale = sc;
-    view.x = (1587 / 2 - (windowRect.x + (windowRect.w - targetW) / 2)) * sc;
-    view.y = (1123 / 2 - (windowRect.y + (windowRect.h - targetH) / 2)) * sc;
-
-    // 2. 【ここが重要】「白い塗りつぶし」を物理的にさせない設定
-    // 印刷の瞬間だけ、canvas自体の背景を白くし、render内の「紙」描画を無効化する
-    const canvasEl = document.getElementById('viewport');
-    canvasEl.style.backgroundColor = "white"; // canvasの裏地を白くする
-
-    // 一旦クリアして再描画
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    render(); 
-
-    // 3. 印刷
-    setTimeout(() => {
-        window.print();
-        
-        // 終わったら元に戻す
-        view = oldView;
-        canvasEl.style.backgroundColor = "#dadce3";
-        render();
-    }, 500);
+    // 5. 画像としてダウンロード
+    const fn = askFilename("survey_map");
+    const a = document.createElement('a');
+    a.href = offCanvas.toDataURL("image/png");
+    a.download = fn + ".png";
+    a.click();
 }
 function exportProjectJSON() {
     const fn = askFilename("project");
