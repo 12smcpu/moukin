@@ -63,7 +63,7 @@
     <div class="btn-group">
         <button id="btn-draw" class="active" onclick="setMode('draw')">ペン</button>
         <button id="btn-erase" onclick="setMode('erase')">消去</button>
-        <button id="btn-window" onclick="setMode('window')">窓(印刷)</button>
+        <button id="btn-window" onclick="setMode('window')">窓く</button>
         <button onclick="undo()">Undo</button>
     </div>
 
@@ -79,7 +79,7 @@
     <div class="section-title">EXPORT</div>
     <div class="btn-group">
         <button onclick="exportDXF()">DXF</button>
-        <button onclick="exportPDFWithWindow()" style="color:var(--accent);">PDF出力</button>
+        <button onclick="exportImageWithWindow()" style="color:var(--accent);">画像出力</button>
     </div>
 </div>
 
@@ -298,53 +298,81 @@ function undo() {
     }
 }
 function exportImageWithWindow() {
-    if (!windowRect || windowRect.w < 5) { alert("範囲を囲ってください"); return; }
+    // 窓が設定されているかチェック
+    if (!windowRect || windowRect.w < 5) { 
+        alert("「窓(印刷)」ボタンを選択し、印刷したい範囲をマウスでドラッグして囲ってください。"); 
+        return; 
+    }
 
-    // 1. 完璧なA3サイズの「隠しキャンバス」を作る
+    // 1. A3サイズの隠しキャンバスを作成
     const offCanvas = document.createElement('canvas');
     offCanvas.width = 1587; 
     offCanvas.height = 1123;
     const octx = offCanvas.getContext('2d');
 
-    // 2. 白い背景を塗る
+    // 2. 背景を白で塗る
     octx.fillStyle = "white";
     octx.fillRect(0, 0, 1587, 1123);
 
-    // 3. 窓の範囲がA3に収まるようにスケール計算
-    const sc = Math.min(1587 / windowRect.w, 1123 / windowRect.h);
-
-    // 4. 窓の範囲をオフスクリーンキャンバスに転写する
-    octx.save();
-    octx.scale(sc, sc);
-    octx.translate(-windowRect.x, -windowRect.y);
-
-    // 地図の描画
-    if (mapImage.complete) {
-        const s = Math.min(A3_W/mapImage.naturalWidth, A3_H/mapImage.naturalHeight);
-        octx.drawImage(mapImage, (A3_W-mapImage.naturalWidth*s)/2, (A3_H-mapImage.naturalHeight*s)/2, mapImage.naturalWidth*s, mapImage.naturalHeight*s);
+    // 3. A3の比率(1.413)に合わせて、描画範囲(target)を計算
+    const A3_RATIO = 1587 / 1123;
+    let targetW = windowRect.w;
+    let targetH = windowRect.h;
+    
+    if (targetW / targetH > A3_RATIO) {
+        targetH = targetW / A3_RATIO;
+    } else {
+        targetW = targetH * A3_RATIO;
     }
 
-    // パスとスタンプの描画（allPathsをループ）
+    // 4. 倍率を計算
+    const sc = 1587 / targetW;
+
+    // 5. 描画開始
+    octx.save();
+    octx.scale(sc, sc);
+    
+    // 窓の左上がA3の左上に来るように配置（余白調整込み）
+    const offsetX = (targetW - windowRect.w) / 2;
+    const offsetY = (targetH - windowRect.h) / 2;
+    octx.translate(-windowRect.x + offsetX, -windowRect.y + offsetY);
+
+    // --- 地図の描画 ---
+    if (mapImage.complete && mapImage.src) {
+        const s = Math.min(1587/mapImage.naturalWidth, 1123/mapImage.naturalHeight);
+        octx.drawImage(mapImage, (1587-mapImage.naturalWidth*s)/2, (1123-mapImage.naturalHeight*s)/2, mapImage.naturalWidth*s, mapImage.naturalHeight*s);
+    }
+
+    // --- 描画データ（ペン・スタンプ）の転写 ---
     allPaths.forEach(item => {
         octx.strokeStyle = octx.fillStyle = item.color;
         octx.lineWidth = 1;
         if (item.type && item.type.startsWith('stamp')) {
             octx.beginPath(); octx.arc(item.x, item.y, 7, 0, Math.PI*2);
             item.type === 'stamp-dot' ? octx.fill() : octx.stroke();
+            if (item.type === 'stamp-double') {
+                octx.beginPath(); octx.arc(item.x, item.y, 4, 0, Math.PI*2); octx.stroke();
+            }
         } else if (item.points) {
-            octx.beginPath(); octx.moveTo(item.points[0].x, item.points[0].y);
+            octx.beginPath(); octx.lineCap = octx.lineJoin = "round";
+            octx.moveTo(item.points[0].x, item.points[0].y);
             item.points.forEach(p => octx.lineTo(p.x, p.y));
             octx.stroke();
         }
     });
     octx.restore();
 
-    // 5. 画像としてダウンロード
-    const fn = askFilename("survey_map");
-    const a = document.createElement('a');
-    a.href = offCanvas.toDataURL("image/png");
-    a.download = fn + ".png";
-    a.click();
+    // 6. 画像(PNG)として保存
+    try {
+        const fileName = askFilename("survey_map");
+        const a = document.createElement('a');
+        a.href = offCanvas.toDataURL("image/png");
+        a.download = fileName + ".png";
+        a.click();
+    } catch (e) {
+        alert("エラーが発生しました。地図画像が読み込まれていない可能性があります。");
+        console.error(e);
+    }
 }
 function exportProjectJSON() {
     const fn = askFilename("project");
