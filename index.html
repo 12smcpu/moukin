@@ -298,22 +298,27 @@ function exportPDFWithWindow() {
         return;
     }
 
-    // 1. 窓のサイズに合わせて倍率（scale）を計算
-    const scaleX = window.innerWidth / windowRect.w;
-    const scaleY = window.innerHeight / windowRect.h;
-    const sc = Math.min(scaleX, scaleY);
+    // 1. ウィンドウのサイズ（印刷対象の解像度）を取得
+    const winW = window.innerWidth;
+    const winH = window.innerHeight;
+
+    // 2. 窓の比率とウィンドウの比率を比較して、隙間が出ない方の倍率を採用する
+    // Math.max を使うことで、画面を「はみ出すくらい一杯に」広げます
+    const sc = Math.max(winW / windowRect.w, winH / windowRect.h);
 
     view.scale = sc;
 
-    // 2. 【最重要】窓の左上(windowRect.x, y)を、キャンバスの左上(0,0)に一致させる計算
-    // A3の中心(A3_W/2)からの相対位置を逆算して、view.x, y をセットします
+    // 3. 窓の左上を (0,0) に固定
     view.x = (A3_W / 2 - windowRect.x) * sc;
     view.y = (A3_H / 2 - windowRect.y) * sc;
 
-    // 3. 描画を更新
+    // 4. 背景のグレーを一時的に「白」に変えて余白を目立たなくする
+    // (render関数内で背景色を塗っている場合は、ここでフラグを立てるか強制塗りつぶし)
+    const oldFill = ctx.fillStyle;
+    
     render();
 
-    // 4. ブラウザが描画を反映するのを少し待ってから印刷
+    // 5. 印刷実行
     setTimeout(() => {
         window.print();
     }, 500);
