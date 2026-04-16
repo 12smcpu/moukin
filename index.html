@@ -298,24 +298,27 @@ function undo() {
     }
 }
 function exportImageWithWindow() {
-    // 窓が設定されているかチェック
     if (!windowRect || windowRect.w < 5) { 
         alert("「窓(印刷)」ボタンを選択し、印刷したい範囲をマウスでドラッグして囲ってください。"); 
         return; 
     }
 
-    // 1. A3サイズの隠しキャンバスを作成
+    // 1. 200dpi相当の解像度 (A3サイズ)
+    const DPI_SCALE = 200 / 96; // 標準の約2.08倍
+    const exportW = 3307; 
+    const exportH = 2339;
+    
     const offCanvas = document.createElement('canvas');
-    offCanvas.width = 1587; 
-    offCanvas.height = 1123;
+    offCanvas.width = exportW; 
+    offCanvas.height = exportH;
     const octx = offCanvas.getContext('2d');
 
     // 2. 背景を白で塗る
     octx.fillStyle = "white";
-    octx.fillRect(0, 0, 1587, 1123);
+    octx.fillRect(0, 0, exportW, exportH);
 
-    // 3. A3の比率(1.413)に合わせて、描画範囲(target)を計算
-    const A3_RATIO = 1587 / 1123;
+    // 3. A3比率(1.414)に合わせて描画範囲を計算
+    const A3_RATIO = exportW / exportH;
     let targetW = windowRect.w;
     let targetH = windowRect.h;
     
@@ -325,20 +328,21 @@ function exportImageWithWindow() {
         targetW = targetH * A3_RATIO;
     }
 
-    // 4. 倍率を計算
-    const sc = 1587 / targetW;
+    // 4. 高解像度用の倍率を計算
+    const sc = exportW / targetW;
 
     // 5. 描画開始
     octx.save();
     octx.scale(sc, sc);
     
-    // 窓の左上がA3の左上に来るように配置（余白調整込み）
+    // 窓の余白調整
     const offsetX = (targetW - windowRect.w) / 2;
     const offsetY = (targetH - windowRect.h) / 2;
     octx.translate(-windowRect.x + offsetX, -windowRect.y + offsetY);
 
     // --- 地図の描画 ---
     if (mapImage.complete && mapImage.src) {
+        // 元のA3基準(1587x1123)での地図配置を再現
         const s = Math.min(1587/mapImage.naturalWidth, 1123/mapImage.naturalHeight);
         octx.drawImage(mapImage, (1587-mapImage.naturalWidth*s)/2, (1123-mapImage.naturalHeight*s)/2, mapImage.naturalWidth*s, mapImage.naturalHeight*s);
     }
@@ -346,12 +350,16 @@ function exportImageWithWindow() {
     // --- 描画データ（ペン・スタンプ）の転写 ---
     allPaths.forEach(item => {
         octx.strokeStyle = octx.fillStyle = item.color;
-        octx.lineWidth = 1;
+        
+        // 高解像度に合わせて線の太さを調整（1 * DPI_SCALE 程度）
+        octx.lineWidth = 2; 
+        
         if (item.type && item.type.startsWith('stamp')) {
-            octx.beginPath(); octx.arc(item.x, item.y, 7, 0, Math.PI*2);
+            const r = 14; // スタンプ半径も大きく調整
+            octx.beginPath(); octx.arc(item.x, item.y, r, 0, Math.PI*2);
             item.type === 'stamp-dot' ? octx.fill() : octx.stroke();
             if (item.type === 'stamp-double') {
-                octx.beginPath(); octx.arc(item.x, item.y, 4, 0, Math.PI*2); octx.stroke();
+                octx.beginPath(); octx.arc(item.x, item.y, r*0.6, 0, Math.PI*2); octx.stroke();
             }
         } else if (item.points) {
             octx.beginPath(); octx.lineCap = octx.lineJoin = "round";
@@ -362,15 +370,15 @@ function exportImageWithWindow() {
     });
     octx.restore();
 
-    // 6. 画像(PNG)として保存
+    // 6. 画像として保存
     try {
-        const fileName = askFilename("survey_map");
+        const fileName = askFilename("survey_map_200dpi");
         const a = document.createElement('a');
         a.href = offCanvas.toDataURL("image/png");
         a.download = fileName + ".png";
         a.click();
     } catch (e) {
-        alert("エラーが発生しました。地図画像が読み込まれていない可能性があります。");
+        alert("エラーが発生しました。");
         console.error(e);
     }
 }
