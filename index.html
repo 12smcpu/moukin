@@ -297,43 +297,50 @@ function undo() {
         render();       // 画面を再描画して反映させる
     }
 }
-// --- PDF出力（窓機能）の最終修正 ---
 function exportPDFWithWindow() {
     if (!windowRect || windowRect.w < 5 || windowRect.h < 5) {
         alert("「窓(印刷)」ボタンを選択し、印刷したい範囲をマウスで囲ってください。");
         return;
     }
 
-    // 1. A3の比率に合わせたターゲットサイズを計算
+    // 1. 現在の表示状態を保存
+    const oldView = { ...view };
+
+    // 2. A3の比率に合わせて「窓」を補正（歪み防止）
     const A3_RATIO = A3_W / A3_H;
     let targetW = windowRect.w;
     let targetH = windowRect.h;
-
     if (targetW / targetH > A3_RATIO) {
         targetH = targetW / A3_RATIO;
     } else {
         targetW = targetH * A3_RATIO;
     }
 
-    // 2. 倍率の決定
+    // 3. 画面のサイズに合わせて、窓が「画面いっぱいに」広がる倍率を計算
+    // ここを window.innerWidth に合わせることで、ブラウザの「印刷範囲」を強制的に埋めます
     const sc = Math.min(window.innerWidth / targetW, window.innerHeight / targetH);
     view.scale = sc;
 
-    // 3. 【重要】座標の再計算
-    // 窓の中心が画面の中央に来るように配置することで、白い「紙」とのズレをなくします
-    const centerX = windowRect.x + windowRect.w / 2;
-    const centerY = windowRect.y + windowRect.h / 2;
-    
-    view.x = window.innerWidth / 2 - (centerX - A3_W / 2) * sc;
-    view.y = window.innerHeight / 2 - (centerY - A3_H / 2) * sc;
+    // 4. 【重要】窓の左上を、画面の左上(0,0)にピッタリ配置
+    // これにより、余白や「白い被り」が出る隙をなくします
+    view.x = (A3_W / 2 - (windowRect.x + (windowRect.w - targetW) / 2)) * sc;
+    view.y = (A3_H / 2 - (windowRect.y + (windowRect.h - targetH) / 2)) * sc;
 
-    // 4. キャンバスを一度クリアして、正しい順序で再描画
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // 5. 背景を一時的に「白」にしてから再描画
+    // render内のグレー塗りつぶしをスキップさせるため、一時的に背景色を強制上書き
+    const canvasEl = document.getElementById('viewport');
+    canvasEl.style.background = "white";
+
     render();
 
-    // 5. 印刷実行
+    // 6. 印刷実行
     setTimeout(() => {
         window.print();
+        
+        // 7. 印刷が終わったら元の表示状態に戻す
+        view = oldView;
+        canvasEl.style.background = "#dadce3";
+        render();
     }, 500);
 }
 function exportProjectJSON() {
