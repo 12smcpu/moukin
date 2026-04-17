@@ -192,22 +192,48 @@ function render() {
 }
 
 window.addEventListener('pointermove', e => {
-    window.currentPointer = e; // 常に最新位置を保存
+    window.currentPointer = e;
     const idx = lastPointers.findIndex(p => p.pointerId === e.pointerId);
     const pt = toCanvas(e.clientX, e.clientY);
 
     if (idx !== -1) {
-        const oldPointer = lastPointers[idx];
+        // --- 1. まず現在のポインタ情報を更新 ---
+        const oldPointers = [...lastPointers]; // 計算用に直前の状態を保持
         lastPointers[idx] = e;
+
         if (isPanning) {
-            if (lastPointers.length > 1) {
-                const p1 = lastPointers[0], p2 = lastPointers[1];
-                const oldD = Math.hypot(p1.clientX - p2.clientX, p1.clientY - p2.clientY);
-                const newD = Math.hypot(lastPointers[0].clientX - lastPointers[1].clientX, lastPointers[0].clientY - lastPointers[1].clientY);
-                if (oldD > 0) view.scale *= (newD / oldD);
+            if (lastPointers.length >= 2) {
+                // --- 2本指：ピンチズーム & パン ---
+                const p1_old = oldPointers[0], p2_old = oldPointers[1];
+                const p1_new = lastPointers[0], p2_new = lastPointers[1];
+
+                // 距離の変化でズーム
+                const dist_old = Math.hypot(p1_old.clientX - p2_old.clientX, p1_old.clientY - p2_old.clientY);
+                const dist_new = Math.hypot(p1_new.clientX - p2_new.clientX, p1_new.clientY - p2_new.clientY);
+                
+                if (dist_old > 0) {
+                    const zoomRatio = dist_new / dist_old;
+                    // 2本の指の中間地点をズームの中心にする
+                    const midX = (p1_new.clientX + p2_new.clientX) / 2;
+                    const midY = (p1_new.clientY + p2_new.clientY) / 2;
+
+                    view.x = midX - (midX - view.x) * zoomRatio;
+                    view.y = midY - (midY - view.y) * zoomRatio;
+                    view.scale *= zoomRatio;
+                }
+
+                // 2本の指の移動量（平均値）でパン移動
+                const moveX = ((p1_new.clientX - p1_old.clientX) + (p2_new.clientX - p2_old.clientX)) / 2;
+                const moveY = ((p1_new.clientY - p1_old.clientY) + (p2_new.clientY - p2_old.clientY)) / 2;
+                view.x += moveX;
+                view.y += moveY;
+
+            } else {
+                // --- 1本指（右クリック等）：通常のパン ---
+                const oldPointer = oldPointers[idx];
+                view.x += e.clientX - oldPointer.clientX;
+                view.y += e.clientY - oldPointer.clientY;
             }
-            view.x += e.clientX - oldPointer.clientX;
-            view.y += e.clientY - oldPointer.clientY;
         } else if (mode === 'window' && windowStart) {
             windowRect = { x: Math.min(windowStart.x, pt.x), y: Math.min(windowStart.y, pt.y), w: Math.abs(pt.x - windowStart.x), h: Math.abs(pt.y - windowStart.y) };
         } else if (currentPath) {
