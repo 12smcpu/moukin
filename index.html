@@ -3,73 +3,131 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>猛禽類調査 Pro - Custom</title>
+    <title>猛禽類調査野帳プロトタイプ</title>
     <style>
-        :root { --accent: #3498db; }
-        body { margin: 0; overflow: hidden; background: #dadce3; font-family: sans-serif; position: fixed; width: 100%; height: 100%; touch-action: none; }
+        :root { 
+            --accent: #2563eb; 
+            --bg-panel: rgba(255, 255, 255, 0.9);
+            --border: #e2e8f0;
+            --text: #1e293b;
+        }
+        body { 
+            margin: 0; overflow: hidden; background: #f1f5f9; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            position: fixed; width: 100%; height: 100%; touch-action: none; 
+        }
+        
+        /* ツールバーのモダン化 */
         #toolbar { 
-            position: fixed; top: 10px; left: 10px; z-index: 1000; background: rgba(255,255,255,0.95); 
-            padding: 10px; border-radius: 12px; display: flex; flex-direction: column; gap: 6px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.15); width: 200px; max-height: 90vh; overflow-y: auto;
-            transition: transform 0.3s ease;
+            position: fixed; top: 20px; left: 20px; z-index: 1000; 
+            background: var(--bg-panel); backdrop-filter: blur(10px);
+            padding: 16px; border-radius: 16px; display: flex; flex-direction: column; gap: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 220px; 
+            max-height: 85vh; overflow-y: auto; border: 1px solid var(--border);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        #toolbar.hidden { transform: translateX(-230px); }
+        #toolbar.hidden { transform: translateX(-260px); opacity: 0; }
+
         #toggle-btn {
-            position: fixed; top: 10px; left: 10px; z-index: 1001;
-            width: 35px; height: 35px; background: var(--accent); color: white;
-            border: none; border-radius: 6px; cursor: pointer; font-size: 18px;
+            position: fixed; top: 20px; left: 20px; z-index: 1001;
+            width: 44px; height: 44px; background: var(--accent); color: white;
+            border: none; border-radius: 12px; cursor: pointer; font-size: 20px;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+            display: flex; align-items: center; justify-content: center;
         }
-        .section-title { font-size: 10px; font-weight: bold; border-left: 3px solid var(--accent); padding-left: 5px; margin-top: 5px; }
-        .btn-group { display: flex; flex-wrap: wrap; gap: 4px; }
-        button { padding: 8px 4px; cursor: pointer; border: 1px solid #ddd; background: #fff; border-radius: 6px; font-size: 11px; flex: 1; min-width: 40px; }
-        button.active { background: var(--accent); color: white; border-color: var(--accent); }
-        .color-btn { width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; flex: none; cursor: pointer; box-sizing: border-box; }
-        .color-btn.selected { border: 2px solid #fff; box-shadow: 0 0 0 2px var(--accent); transform: scale(1.1); }
+
+        .section { display: flex; flex-direction: column; gap: 6px; }
+        .section-title { 
+            font-size: 11px; font-weight: 700; color: #64748b; 
+            letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 2px;
+        }
+
+        .btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+        .btn-group.triple { grid-template-columns: 1fr 1fr 1fr; }
+
+        button { 
+            padding: 10px 8px; cursor: pointer; border: 1px solid var(--border); 
+            background: #fff; border-radius: 8px; font-size: 12px; font-weight: 500;
+            color: var(--text); transition: all 0.2s;
+            display: flex; align-items: center; justify-content: center; gap: 4px;
+        }
+        button:hover { background: #f8fafc; border-color: #cbd5e1; }
+        button.active { 
+            background: var(--accent); color: white; border-color: var(--accent);
+            box-shadow: 0 4px 10px rgba(37, 99, 235, 0.2);
+        }
+
+        /* カラーピッカーの洗練 */
+        #colorPicker { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 0; }
+        .color-btn { 
+            width: 26px; height: 26px; border-radius: 8px; 
+            border: 2px solid transparent; cursor: pointer; 
+            transition: transform 0.2s; position: relative;
+        }
+        .color-btn.selected { 
+            transform: scale(1.2); border-color: #fff; 
+            box-shadow: 0 0 0 2px var(--accent);
+        }
+
         canvas { display: block; background: transparent; cursor: crosshair; }
-        @media print {
-            #toolbar, #toggle-btn { display: none !important; }
-            body { background: white !important; position: static !important; }
-            @page { margin: 0; size: A3 landscape; }
+
+        /* カスタムファイル入力 */
+        .file-label {
+            font-size: 11px; background: #f1f5f9; padding: 8px; border-radius: 8px;
+            border: 1px dashed #cbd5e1; text-align: center; cursor: pointer;
         }
     </style>
 </head>
 <body>
 
-<button id="toggle-btn" onclick="toggleToolbar()">≡</button>
+<button id="toggle-btn" onclick="toggleToolbar()">☰</button>
 
 <div id="toolbar">
-    <div class="section-title">FILE</div>
-    <div class="btn-group">
-        <button onclick="exportProjectJSON()">保存</button>
-        <button onclick="document.getElementById('importFile').click()">開く</button>
-    </div>
-    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importProjectJSON(this)">
-
-    <div class="section-title">MAP</div>
-    <input type="file" id="mapInput" accept="image/*" style="font-size: 9px; width: 100%;">
-    <button onclick="resetView()">全体表示</button>
-
-    <div class="section-title">TOOLS</div>
-    <div class="btn-group">
-        <button id="btn-draw" class="active" onclick="setMode('draw')">ペン</button>
-        <button id="btn-erase" onclick="setMode('erase')">消去</button>
-        <button id="btn-window" onclick="setMode('window')">窓(印刷)</button>
-        <button onclick="undo()">Undo</button>
+    <div class="section">
+        <div class="section-title">Project</div>
+        <div class="btn-group">
+            <button onclick="exportProjectJSON()">💾 保存</button>
+            <button onclick="document.getElementById('importFile').click()">📂 開く</button>
+        </div>
+        <input type="file" id="importFile" accept=".json" style="display:none" onchange="importProjectJSON(this)">
     </div>
 
-    <div class="section-title">STAMPS</div>
-    <div class="btn-group">
-        <button id="btn-s1" onclick="setMode('stamp-circle')">〇</button>
-        <button id="btn-s2" onclick="setMode('stamp-dot')">●</button>
-        <button id="btn-s3" onclick="setMode('stamp-double')">◎</button>
+    <div class="section">
+        <div class="section-title">Basemap</div>
+        <label class="file-label" for="mapInput">🗺️ 画像を選択</label>
+        <input type="file" id="mapInput" accept="image/*" style="display:none">
+        <button onclick="resetView()" style="margin-top:4px;"> センター復帰</button>
     </div>
 
-    <div id="colorPicker" class="btn-group"></div>
+    <div class="section">
+        <div class="section-title">Drawing Tools</div>
+        <div class="btn-group">
+            <button id="btn-draw" class="active" onclick="setMode('draw')">✏️ ペン</button>
+            <button id="btn-erase" onclick="setMode('erase')">🧹 消しゴム</button>
+        </div>
+        <div class="btn-group">
+            <button id="btn-window" onclick="setMode('window')">🖼️ 印刷窓く</button>
+            <button onclick="undo()">↩️ 戻る</button>
+        </div>
+    </div>
 
-    <div class="section-title">EXPORT</div>
-    <div class="btn-group">
-        <button onclick="exportDXF()">DXF</button>
-        <button onclick="exportImageWithWindow()" style="color:var(--accent);">画像出力</button>
+    <div class="section">
+        <div class="section-title">Analysis Stamps</div>
+        <div class="btn-group triple">
+            <button id="btn-s1" onclick="setMode('stamp-circle')">〇</button>
+            <button id="btn-s2" onclick="setMode('stamp-dot')">●</button>
+            <button id="btn-s3" onclick="setMode('stamp-double')">◎</button>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Color</div>
+        <div id="colorPicker"></div>
+    </div>
+
+    <div class="section" style="margin-top: 10px; border-top: 1px solid var(--border); padding-top: 15px;">
+        <button onclick="exportDXF()" style="width:100%; margin-bottom:6px;">📐 CAD形式 (DXF)</button>
+        <button onclick="exportImageWithWindow()" style="width:100%; background:#eff6ff; color:var(--accent); border-color:#bfdbfe;">📸 PNG画像出力</button>
     </div>
 </div>
 
@@ -105,17 +163,14 @@ function resize() {
 }
 
 function toCanvas(sx, sy) {
-    return { 
-        x: (sx - view.x) / view.scale + A3_W / 2, 
-        y: (sy - view.y) / view.scale + A3_H / 2 
-    };
+    return { x: (sx - view.x) / view.scale + A3_W / 2, y: (sy - view.y) / view.scale + A3_H / 2 };
 }
 
 function render() {
     const dpr = window.devicePixelRatio || 1;
     ctx.save();
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = "#dadce3"; ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+    ctx.fillStyle = "#f1f5f9"; ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
     ctx.restore();
 
     ctx.save();
@@ -123,11 +178,9 @@ function render() {
     ctx.scale(view.scale, view.scale);
     ctx.translate(-A3_W/2, -A3_H/2);
 
-    // 紙
     ctx.fillStyle = "#fff";
     ctx.fillRect(0, 0, A3_W, A3_H);
     
-    // クリッピング開始
     ctx.save();
     ctx.beginPath(); ctx.rect(0, 0, A3_W, A3_H); ctx.clip();
 
@@ -139,7 +192,7 @@ function render() {
     const drawItem = (item) => {
         if (!item) return;
         ctx.strokeStyle = ctx.fillStyle = item.color;
-        ctx.lineWidth = 1; 
+        ctx.lineWidth = 2 / view.scale < 1 ? 1 : 2 / view.scale; // ズームに合わせて太さを微調整
         if (item.type && item.type.startsWith('stamp')) {
             const r = 7; 
             ctx.beginPath(); ctx.arc(item.x, item.y, r, 0, Math.PI*2);
@@ -149,6 +202,7 @@ function render() {
             }
         } else if (item.points) {
             ctx.beginPath(); ctx.lineCap = ctx.lineJoin = "round";
+            ctx.lineWidth = 2; // ペンは一定の太さ
             ctx.moveTo(item.points[0].x, item.points[0].y);
             item.points.forEach(p => ctx.lineTo(p.x, p.y));
             ctx.stroke();
@@ -158,7 +212,6 @@ function render() {
     allPaths.forEach(drawItem);
     if (currentPath) drawItem(currentPath);
 
-    // --- スタンプのプレビュー表示 (ニュートラル対応) ---
     if (mode.startsWith('stamp') && !isPanning && window.currentPointer) {
         const p = toCanvas(window.currentPointer.clientX, window.currentPointer.clientY);
         if (p.x >= 0 && p.x <= A3_W && p.y >= 0 && p.y <= A3_H) {
@@ -177,12 +230,10 @@ function render() {
             ctx.restore();
         }
     }
+    ctx.restore();
 
-    ctx.restore(); // クリッピング終了
-
-    // 窓のプレビュー
     if (mode === 'window' && windowRect) {
-        ctx.strokeStyle = "rgba(52, 152, 219, 0.8)";
+        ctx.strokeStyle = "rgba(37, 99, 235, 0.8)";
         ctx.lineWidth = 2;
         ctx.setLineDash([5, 5]);
         ctx.strokeRect(windowRect.x, windowRect.y, windowRect.w, windowRect.h);
@@ -197,42 +248,23 @@ window.addEventListener('pointermove', e => {
     const pt = toCanvas(e.clientX, e.clientY);
 
     if (idx !== -1) {
-        // --- 1. まず現在のポインタ情報を更新 ---
-        const oldPointers = [...lastPointers]; // 計算用に直前の状態を保持
+        const oldPointers = [...lastPointers];
         lastPointers[idx] = e;
-
         if (isPanning) {
             if (lastPointers.length >= 2) {
-                // --- 2本指：ピンチズーム & パン ---
-                const p1_old = oldPointers[0], p2_old = oldPointers[1];
-                const p1_new = lastPointers[0], p2_new = lastPointers[1];
-
-                // 距離の変化でズーム
-                const dist_old = Math.hypot(p1_old.clientX - p2_old.clientX, p1_old.clientY - p2_old.clientY);
-                const dist_new = Math.hypot(p1_new.clientX - p2_new.clientX, p1_new.clientY - p2_new.clientY);
-                
-                if (dist_old > 0) {
-                    const zoomRatio = dist_new / dist_old;
-                    // 2本の指の中間地点をズームの中心にする
-                    const midX = (p1_new.clientX + p2_new.clientX) / 2;
-                    const midY = (p1_new.clientY + p2_new.clientY) / 2;
-
-                    view.x = midX - (midX - view.x) * zoomRatio;
-                    view.y = midY - (midY - view.y) * zoomRatio;
-                    view.scale *= zoomRatio;
+                const p1_o = oldPointers[0], p2_o = oldPointers[1], p1_n = lastPointers[0], p2_n = lastPointers[1];
+                const d_o = Math.hypot(p1_o.clientX - p2_o.clientX, p1_o.clientY - p2_o.clientY);
+                const d_n = Math.hypot(p1_n.clientX - p2_n.clientX, p1_n.clientY - p2_n.clientY);
+                if (d_o > 0) {
+                    const ratio = d_n / d_o;
+                    const mx = (p1_n.clientX + p2_n.clientX) / 2, my = (p1_n.clientY + p2_n.clientY) / 2;
+                    view.x = mx - (mx - view.x) * ratio; view.y = my - (my - view.y) * ratio; view.scale *= ratio;
                 }
-
-                // 2本の指の移動量（平均値）でパン移動
-                const moveX = ((p1_new.clientX - p1_old.clientX) + (p2_new.clientX - p2_old.clientX)) / 2;
-                const moveY = ((p1_new.clientY - p1_old.clientY) + (p2_new.clientY - p2_old.clientY)) / 2;
-                view.x += moveX;
-                view.y += moveY;
-
+                view.x += ((p1_n.clientX - p1_o.clientX) + (p2_n.clientX - p2_o.clientX)) / 2;
+                view.y += ((p1_n.clientY - p1_o.clientY) + (p2_n.clientY - p2_o.clientY)) / 2;
             } else {
-                // --- 1本指（右クリック等）：通常のパン ---
-                const oldPointer = oldPointers[idx];
-                view.x += e.clientX - oldPointer.clientX;
-                view.y += e.clientY - oldPointer.clientY;
+                view.x += e.clientX - oldPointers[idx].clientX;
+                view.y += e.clientY - oldPointers[idx].clientY;
             }
         } else if (mode === 'window' && windowStart) {
             windowRect = { x: Math.min(windowStart.x, pt.x), y: Math.min(windowStart.y, pt.y), w: Math.abs(pt.x - windowStart.x), h: Math.abs(pt.y - windowStart.y) };
@@ -246,16 +278,16 @@ window.addEventListener('pointermove', e => {
 canvas.addEventListener('pointerdown', e => {
     lastPointers.push(e);
     const pt = toCanvas(e.clientX, e.clientY);
-    if (e.button === 2 || lastPointers.length > 1) { isPanning = true; return; }
+    if (e.button === 2 || lastPointers.length > 1) { 
+        isPanning = true; 
+        if (mode.startsWith('stamp') && allPaths.length > 0 && !currentPath) allPaths.pop();
+        return; 
+    }
     if (mode === 'window') { windowStart = pt; return; }
     if (pt.x < 0 || pt.x > A3_W || pt.y < 0 || pt.y > A3_H) return;
-
-    if (mode.startsWith('stamp')) {
-        allPaths.push({type: mode, x: pt.x, y: pt.y, color: currentColor});
-        render();
-    } else if (mode === 'draw') {
-        currentPath = {points: [pt], color: currentColor};
-    } else if (mode === 'erase') {
+    if (mode.startsWith('stamp')) { allPaths.push({type: mode, x: pt.x, y: pt.y, color: currentColor}); render(); }
+    else if (mode === 'draw') currentPath = {points: [pt], color: currentColor};
+    else if (mode === 'erase') {
         allPaths = allPaths.filter(i => {
             const dist = i.points ? i.points.some(p => Math.hypot(p.x-pt.x, p.y-pt.y) < 20/view.scale) : Math.hypot(i.x-pt.x, i.y-pt.y) < 20/view.scale;
             return !dist;
@@ -266,24 +298,18 @@ canvas.addEventListener('pointerdown', e => {
 
 window.addEventListener('pointerup', e => {
     lastPointers = lastPointers.filter(p => p.pointerId !== e.pointerId);
-    if (lastPointers.length === 0) {
-        isPanning = false; windowStart = null;
-        if (currentPath) { allPaths.push(currentPath); currentPath = null; }
-    }
+    if (lastPointers.length === 0) { isPanning = false; windowStart = null; if (currentPath) { allPaths.push(currentPath); currentPath = null; } }
     render();
 });
 
 canvas.addEventListener('wheel', e => {
     e.preventDefault();
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    view.x = e.clientX - (e.clientX - view.x) * delta;
-    view.y = e.clientY - (e.clientY - view.y) * delta;
-    view.scale *= delta;
-    render();
+    view.x = e.clientX - (e.clientX - view.x) * delta; view.y = e.clientY - (e.clientY - view.y) * delta;
+    view.scale *= delta; render();
 }, { passive: false });
 
 function toggleToolbar() { document.getElementById('toolbar').classList.toggle('hidden'); }
-
 function setMode(m) { 
     mode = m;
     const btns = {draw:'btn-draw', erase:'btn-erase', 'stamp-circle':'btn-s1', 'stamp-dot':'btn-s2', 'stamp-double':'btn-s3', 'window':'btn-window'};
@@ -293,7 +319,7 @@ function setMode(m) {
 
 function createColorButtons() {
     const cp = document.getElementById('colorPicker'); cp.innerHTML = '';
-    ['red', 'blue', 'purple', 'green', 'orange', 'black'].forEach(c => {
+    ['#ef4444', '#3b82f6', '#a855f7', '#22c55e', '#f59e0b', '#0f172a'].forEach(c => {
         const b = document.createElement('div'); b.className = 'color-btn' + (c === currentColor ? ' selected' : '');
         b.style.background = c; b.onclick = () => { currentColor = c; createColorButtons(); if(mode==='erase') setMode('draw'); };
         cp.appendChild(b);
@@ -302,57 +328,110 @@ function createColorButtons() {
 
 function resetView() {
     const s = Math.min((window.innerWidth-100)/A3_W, (window.innerHeight-100)/A3_H);
-    view = { x: window.innerWidth/2, y: window.innerHeight/2, scale: s };
-    render();
+    view = { x: window.innerWidth/2, y: window.innerHeight/2, scale: s }; render();
 }
 
-function askFilename(def) { const n = prompt("ファイル名を入力してください", def); return n ? n : def; }
+function askFilename(def) { 
+    const n = prompt("ファイル名を入力してください", def); 
+    if (n === null) return null; // キャンセルボタンを押した場合
+    return n.trim() || def;      // 空文字ならデフォルト、入力があればそれを返す
+}
 
 function exportDXF() {
-    const fn = askFilename("survey");
-    let d = "0\nSECTION\n2\nENTITIES\n";
-    const cm = {red:1, blue:5, purple:6, green:3, orange:40, black:7};
+    const fn = askFilename("survey_data");
+    if (!fn) return; // ★追加：キャンセルならここで終了
+    
+    // 1. ヘッダー: AutoCAD R12形式を指定
+    let d = "  0\nSECTION\n  2\nHEADER\n  9\n$ACADVER\n  1\nAC1009\n  0\nENDSEC\n";
+    
+    // 2. テーブル: レイヤー「Survey_Data」を定義
+    d += "  0\nSECTION\n  2\nTABLES\n  0\nTABLE\n  2\nLAYER\n 70\n10\n";
+    d += "  0\nLAYER\n  2\nSurvey_Data\n 70\n 0\n 62\n 7\n  6\nCONTINUOUS\n";
+    d += "  0\nLAYER\n  2\nMap_Frame\n 70\n 0\n 62\n 8\n  6\nCONTINUOUS\n";
+    d += "  0\nENDTAB\n  0\nENDSEC\n";
+
+    // 3. エンティティセクション
+    d += "  0\nSECTION\n  2\nENTITIES\n";
+    
+    const getColorNum = (hex) => {
+        const map = {
+            '#ef4444': 1, '#3b82f6': 5, '#a855f7': 6, '#22c55e': 3, '#f59e0b': 40, '#0f172a': 7
+        };
+        return map[hex] || 7;
+    };
+
+    // --- 地図の外枠（Map_Frame） ---
+    if (mapImage.complete && mapImage.src) {
+        const s = Math.min(A3_W / mapImage.naturalWidth, A3_H / mapImage.naturalHeight);
+        const w = mapImage.naturalWidth * s;
+        const h = mapImage.naturalHeight * s;
+        const x = (A3_W - w) / 2;
+        const y = (A3_H - h) / 2;
+
+        // AutoCADで最も安定するPOLYLINE形式
+        d += `  0\nPOLYLINE\n  8\nMap_Frame\n 62\n 8\n 66\n 1\n`;
+        const pts = [{x:x, y:y}, {x:x+w, y:y}, {x:x+w, y:y+h}, {x:x, y:y+h}, {x:x, y:y}];
+        pts.forEach(p => d += `  0\nVERTEX\n  8\nMap_Frame\n 10\n${p.x.toFixed(3)}\n 20\n${(-p.y).toFixed(3)}\n`);
+        d += "  0\nSEQEND\n";
+    }
+
+    // --- 各調査データ（Survey_Data） ---
     allPaths.forEach(i => {
-        const c = cm[i.color]||7;
-        if (i.points) {
-            d += `0\nPOLYLINE\n8\nSurvey\n62\n${c}\n66\n1\n40\n1.0\n41\n1.0\n`;
-            i.points.forEach(p => d += `0\nVERTEX\n8\nSurvey\n10\n${p.x}\n20\n${-p.y}\n`);
-            d += "0\nSEQEND\n";
-        } else {
-            d += `0\nCIRCLE\n8\nSurvey\n62\n${c}\n10\n${i.x}\n20\n${-i.y}\n40\n7.0\n`;
+        const c = getColorNum(i.color);
+        const layer = "Survey_Data";
+        
+        if (i.points && i.points.length > 1) {
+            d += `  0\nPOLYLINE\n  8\n${layer}\n 62\n ${c}\n 66\n 1\n`;
+            i.points.forEach(p => d += `  0\nVERTEX\n  8\n${layer}\n 10\n${p.x.toFixed(3)}\n 20\n${(-p.y).toFixed(3)}\n`);
+            d += "  0\nSEQEND\n";
+        } else if (i.type) {
+            const r = 7.0; 
+            if (i.type === 'stamp-circle' || i.type === 'stamp-double') {
+                d += `  0\nCIRCLE\n  8\n${layer}\n 62\n ${c}\n 10\n${i.x.toFixed(3)}\n 20\n${(-i.y).toFixed(3)}\n 40\n${r}\n`;
+            }
+            if (i.type === 'stamp-double') {
+                d += `  0\nCIRCLE\n  8\n${layer}\n 62\n ${c}\n 10\n${i.x.toFixed(3)}\n 20\n${(-i.y).toFixed(3)}\n 40\n${(r*0.6).toFixed(3)}\n`;
+            }
+            if (i.type === 'stamp-dot') {
+                // ● 塗りつぶし: AutoCADの「HATCH」を使用して円形に塗りつぶす
+                // まず外枠の円を定義
+                d += `  0\nCIRCLE\n  8\n${layer}\n 62\n ${c}\n 10\n${i.x.toFixed(3)}\n 20\n${(-i.y).toFixed(3)}\n 40\n${r}\n`;
+                
+                // 次にその中身をHATCH（SOLIDパターン）で埋める
+                d += `  0\nHATCH\n  8\n${layer}\n 62\n ${c}\n  2\nSOLID\n 70\n 1\n 71\n 0\n 91\n 1\n`;
+                d += ` 92\n 1\n 93\n 1\n 72\n 1\n 10\n${i.x.toFixed(3)}\n 20\n${(-i.y).toFixed(3)}\n 40\n${r}\n 73\n 0\n 74\n 0\n`;
+                d += `210\n 0.0\n220\n 0.0\n230\n 1.0\n 75\n 1\n 76\n 1\n 98\n 1\n 10\n0.0\n 20\n0.0\n`;
+            }
         }
     });
+
+    d += "  0\nENDSEC\n  0\nEOF";
+
+    const blob = new Blob([d], {type: "application/dxf"});
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([d+"0\nENDSEC\n0\nEOF"], {type:"application/dxf"}));
-    a.download = fn + ".dxf"; a.click();
+    a.href = URL.createObjectURL(blob);
+    a.download = fn + ".dxf";
+    a.click();
 }
 
-function undo() {
-    if (allPaths.length > 0) { allPaths.pop(); render(); }
-}
+function undo() { if (allPaths.length > 0) { allPaths.pop(); render(); } }
 
 function exportImageWithWindow() {
-    if (!windowRect || windowRect.w < 5) { alert("「窓(印刷)」ボタンを選択し、範囲をドラッグで囲ってください。"); return; }
+    if (!windowRect || windowRect.w < 5) { alert("印刷窓を設定してください"); return; }
     const exportW = 3307, exportH = 2339;
-    const offCanvas = document.createElement('canvas');
-    offCanvas.width = exportW; offCanvas.height = exportH;
+    const offCanvas = document.createElement('canvas'); offCanvas.width = exportW; offCanvas.height = exportH;
     const octx = offCanvas.getContext('2d');
     octx.fillStyle = "white"; octx.fillRect(0, 0, exportW, exportH);
-    const A3_RATIO = exportW / exportH;
-    let targetW = windowRect.w, targetH = windowRect.h;
-    if (targetW / targetH > A3_RATIO) targetH = targetW / A3_RATIO;
-    else targetW = targetH * A3_RATIO;
-    const sc = exportW / targetW;
-    octx.save();
-    octx.scale(sc, sc);
-    octx.translate(-windowRect.x + (targetW - windowRect.w) / 2, -windowRect.y + (targetH - windowRect.h) / 2);
+    let tw = windowRect.w, th = windowRect.h;
+    if (tw / th > exportW/exportH) th = tw / (exportW/exportH); else tw = th * (exportW/exportH);
+    const sc = exportW / tw;
+    octx.save(); octx.scale(sc, sc); octx.translate(-windowRect.x + (tw - windowRect.w) / 2, -windowRect.y + (th - windowRect.h) / 2);
     if (mapImage.complete && mapImage.src) {
         const s = Math.min(1587/mapImage.naturalWidth, 1123/mapImage.naturalHeight);
         octx.drawImage(mapImage, (1587-mapImage.naturalWidth*s)/2, (1123-mapImage.naturalHeight*s)/2, mapImage.naturalWidth*s, mapImage.naturalHeight*s);
     }
     allPaths.forEach(item => {
-        octx.strokeStyle = octx.fillStyle = item.color;
-        octx.lineWidth = 2; 
+        octx.strokeStyle = octx.fillStyle = item.color; octx.lineWidth = 2; 
         if (item.type && item.type.startsWith('stamp')) {
             const r = 7; octx.beginPath(); octx.arc(item.x, item.y, r, 0, Math.PI*2);
             item.type === 'stamp-dot' ? octx.fill() : octx.stroke();
@@ -360,27 +439,24 @@ function exportImageWithWindow() {
         } else if (item.points) {
             octx.beginPath(); octx.lineCap = octx.lineJoin = "round";
             octx.moveTo(item.points[0].x, item.points[0].y);
-            item.points.forEach(p => octx.lineTo(p.x, p.y));
-            octx.stroke();
+            item.points.forEach(p => octx.lineTo(p.x, p.y)); octx.stroke();
         }
     });
     octx.restore();
-    try {
-        const fileName = askFilename("survey_map");
-        const a = document.createElement('a'); a.href = offCanvas.toDataURL("image/png");
-        a.download = fileName + ".png"; a.click();
-    } catch (e) { alert("エラーが発生しました。"); }
+    const fn = askFilename("survey_map");
+    const a = document.createElement('a'); a.href = offCanvas.toDataURL("image/png");
+    a.download = fn + ".png"; a.click();
 }
 
 function exportProjectJSON() {
     const fn = askFilename("project");
+    if (!fn) return; // ★追加：キャンセルならここで終了
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({map:mapImage.src, paths:allPaths})], {type:"application/json"}));
     a.download = fn + ".json"; a.click();
 }
 
 function importProjectJSON(i) {
-    const r = new FileReader();
-    r.onload = e => {
+    const r = new FileReader(); r.onload = e => {
         const d = JSON.parse(e.target.result); allPaths = d.paths || [];
         mapImage = new Image(); mapImage.onload = () => { resetView(); render(); }; mapImage.src = d.map || "";
     };
@@ -388,8 +464,7 @@ function importProjectJSON(i) {
 }
 
 document.getElementById('mapInput').onchange = e => {
-    const r = new FileReader();
-    r.onload = f => { mapImage = new Image(); mapImage.onload = resetView; mapImage.src = f.target.result; };
+    const r = new FileReader(); r.onload = f => { mapImage = new Image(); mapImage.onload = resetView; mapImage.src = f.target.result; };
     if(e.target.files[0]) r.readAsDataURL(e.target.files[0]);
 };
 
