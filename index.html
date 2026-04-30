@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>猛禽類調査野帳プロトタイプ</title>
+    <title>猛禽類調査電子野帳 プロトタイプ</title>
     <style>
         :root { 
             --accent: #2563eb; 
@@ -16,8 +16,6 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
             position: fixed; width: 100%; height: 100%; touch-action: none; 
         }
-        
-        /* ツールバーのモダン化 */
         #toolbar { 
             position: fixed; top: 20px; left: 20px; z-index: 1000; 
             background: var(--bg-panel); backdrop-filter: blur(10px);
@@ -27,7 +25,6 @@
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
         #toolbar.hidden { transform: translateX(-260px); opacity: 0; }
-
         #toggle-btn {
             position: fixed; top: 20px; left: 20px; z-index: 1001;
             width: 44px; height: 44px; background: var(--accent); color: white;
@@ -35,16 +32,10 @@
             box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
             display: flex; align-items: center; justify-content: center;
         }
-
         .section { display: flex; flex-direction: column; gap: 6px; }
-        .section-title { 
-            font-size: 11px; font-weight: 700; color: #64748b; 
-            letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 2px;
-        }
-
+        .section-title { font-size: 11px; font-weight: 700; color: #64748b; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 2px; }
         .btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
         .btn-group.triple { grid-template-columns: 1fr 1fr 1fr; }
-
         button { 
             padding: 10px 8px; cursor: pointer; border: 1px solid var(--border); 
             background: #fff; border-radius: 8px; font-size: 12px; font-weight: 500;
@@ -52,30 +43,12 @@
             display: flex; align-items: center; justify-content: center; gap: 4px;
         }
         button:hover { background: #f8fafc; border-color: #cbd5e1; }
-        button.active { 
-            background: var(--accent); color: white; border-color: var(--accent);
-            box-shadow: 0 4px 10px rgba(37, 99, 235, 0.2);
-        }
-
-        /* カラーピッカーの洗練 */
+        button.active { background: var(--accent); color: white; border-color: var(--accent); box-shadow: 0 4px 10px rgba(37, 99, 235, 0.2); }
         #colorPicker { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 0; }
-        .color-btn { 
-            width: 26px; height: 26px; border-radius: 8px; 
-            border: 2px solid transparent; cursor: pointer; 
-            transition: transform 0.2s; position: relative;
-        }
-        .color-btn.selected { 
-            transform: scale(1.2); border-color: #fff; 
-            box-shadow: 0 0 0 2px var(--accent);
-        }
-
+        .color-btn { width: 26px; height: 26px; border-radius: 8px; border: 2px solid transparent; cursor: pointer; transition: transform 0.2s; position: relative; }
+        .color-btn.selected { transform: scale(1.2); border-color: #fff; box-shadow: 0 0 0 2px var(--accent); }
         canvas { display: block; background: transparent; cursor: crosshair; }
-
-        /* カスタムファイル入力 */
-        .file-label {
-            font-size: 11px; background: #f1f5f9; padding: 8px; border-radius: 8px;
-            border: 1px dashed #cbd5e1; text-align: center; cursor: pointer;
-        }
+        .file-label { font-size: 11px; background: #f1f5f9; padding: 8px; border-radius: 8px; border: 1px dashed #cbd5e1; text-align: center; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -106,7 +79,7 @@
             <button id="btn-erase" onclick="setMode('erase')">🧹 消しゴム</button>
         </div>
         <div class="btn-group">
-            <button id="btn-window" onclick="setMode('window')">🖼️ 印刷窓く</button>
+            <button id="btn-window" onclick="setMode('window')">🖼️ 印刷窓</button>
             <button onclick="undo()">↩️ 戻る</button>
         </div>
     </div>
@@ -126,8 +99,8 @@
     </div>
 
     <div class="section" style="margin-top: 10px; border-top: 1px solid var(--border); padding-top: 15px;">
-        <button onclick="exportDXF()" style="width:100%; margin-bottom:6px;">📐 CAD形式 (DXF)</button>
-        <button onclick="exportImageWithWindow()" style="width:100%; background:#eff6ff; color:var(--accent); border-color:#bfdbfe;">📸 PNG画像出力</button>
+        <button onclick="exportDXF()" style="width:100%; margin-bottom:6px;">📐 AutoCAD用 (DXF)</button>
+        <button onclick="exportImageWithWindow()" style="width:100%; background:#eff6ff; color:var(--accent); border-color:#bfdbfe;">📸 画像出力</button>
     </div>
 </div>
 
@@ -138,7 +111,7 @@ const A3_W = 1587, A3_H = 1123;
 const canvas = document.getElementById('viewport');
 const ctx = canvas.getContext('2d');
 let mapImage = new Image(), allPaths = [], currentPath = null;
-let mode = 'draw', currentColor = 'red', view = { x: 0, y: 0, scale: 0.5 };
+let mode = 'draw', currentColor = '#ef4444', view = { x: 0, y: 0, scale: 0.5 };
 let lastPointers = [], isPanning = false;
 let windowStart = null, windowRect = null;
 
@@ -192,7 +165,7 @@ function render() {
     const drawItem = (item) => {
         if (!item) return;
         ctx.strokeStyle = ctx.fillStyle = item.color;
-        ctx.lineWidth = 2 / view.scale < 1 ? 1 : 2 / view.scale; // ズームに合わせて太さを微調整
+        ctx.lineWidth = 2;
         if (item.type && item.type.startsWith('stamp')) {
             const r = 7; 
             ctx.beginPath(); ctx.arc(item.x, item.y, r, 0, Math.PI*2);
@@ -202,7 +175,6 @@ function render() {
             }
         } else if (item.points) {
             ctx.beginPath(); ctx.lineCap = ctx.lineJoin = "round";
-            ctx.lineWidth = 2; // ペンは一定の太さ
             ctx.moveTo(item.points[0].x, item.points[0].y);
             item.points.forEach(p => ctx.lineTo(p.x, p.y));
             ctx.stroke();
@@ -245,8 +217,6 @@ function render() {
 window.addEventListener('pointermove', e => {
     window.currentPointer = e;
     const idx = lastPointers.findIndex(p => p.pointerId === e.pointerId);
-    const pt = toCanvas(e.clientX, e.clientY);
-
     if (idx !== -1) {
         const oldPointers = [...lastPointers];
         lastPointers[idx] = e;
@@ -267,9 +237,10 @@ window.addEventListener('pointermove', e => {
                 view.y += e.clientY - oldPointers[idx].clientY;
             }
         } else if (mode === 'window' && windowStart) {
+            const pt = toCanvas(e.clientX, e.clientY);
             windowRect = { x: Math.min(windowStart.x, pt.x), y: Math.min(windowStart.y, pt.y), w: Math.abs(pt.x - windowStart.x), h: Math.abs(pt.y - windowStart.y) };
         } else if (currentPath) {
-            currentPath.points.push(pt);
+            currentPath.points.push(toCanvas(e.clientX, e.clientY));
         }
     }
     render();
@@ -333,85 +304,55 @@ function resetView() {
 
 function askFilename(def) { 
     const n = prompt("ファイル名を入力してください", def); 
-    if (n === null) return null; // キャンセルボタンを押した場合
-    return n.trim() || def;      // 空文字ならデフォルト、入力があればそれを返す
+    if (n === null) return null; 
+    return n.trim() || def;
 }
 
 function exportDXF() {
     const fn = askFilename("survey_data");
-    if (!fn) return; // ★追加：キャンセルならここで終了
+    if (!fn) return;
     
-    // 1. ヘッダー: AutoCAD R12形式を指定
     let d = "  0\nSECTION\n  2\nHEADER\n  9\n$ACADVER\n  1\nAC1009\n  0\nENDSEC\n";
-    
-    // 2. テーブル: レイヤー「Survey_Data」を定義
     d += "  0\nSECTION\n  2\nTABLES\n  0\nTABLE\n  2\nLAYER\n 70\n10\n";
     d += "  0\nLAYER\n  2\nSurvey_Data\n 70\n 0\n 62\n 7\n  6\nCONTINUOUS\n";
     d += "  0\nLAYER\n  2\nMap_Frame\n 70\n 0\n 62\n 8\n  6\nCONTINUOUS\n";
-    d += "  0\nENDTAB\n  0\nENDSEC\n";
-
-    // 3. エンティティセクション
-    d += "  0\nSECTION\n  2\nENTITIES\n";
+    d += "  0\nENDTAB\n  0\nENDSEC\n  0\nSECTION\n  2\nENTITIES\n";
     
-    const getColorNum = (hex) => {
-        const map = {
-            '#ef4444': 1, '#3b82f6': 5, '#a855f7': 6, '#22c55e': 3, '#f59e0b': 40, '#0f172a': 7
-        };
-        return map[hex] || 7;
-    };
+    const cm = {'#ef4444': 1, '#3b82f6': 5, '#a855f7': 6, '#22c55e': 3, '#f59e0b': 40, '#0f172a': 7};
 
-    // --- 地図の外枠（Map_Frame） ---
     if (mapImage.complete && mapImage.src) {
         const s = Math.min(A3_W / mapImage.naturalWidth, A3_H / mapImage.naturalHeight);
-        const w = mapImage.naturalWidth * s;
-        const h = mapImage.naturalHeight * s;
-        const x = (A3_W - w) / 2;
-        const y = (A3_H - h) / 2;
-
-        // AutoCADで最も安定するPOLYLINE形式
+        const w = mapImage.naturalWidth * s, h = mapImage.naturalHeight * s;
+        const x = (A3_W - w) / 2, y = (A3_H - h) / 2;
         d += `  0\nPOLYLINE\n  8\nMap_Frame\n 62\n 8\n 66\n 1\n`;
         const pts = [{x:x, y:y}, {x:x+w, y:y}, {x:x+w, y:y+h}, {x:x, y:y+h}, {x:x, y:y}];
         pts.forEach(p => d += `  0\nVERTEX\n  8\nMap_Frame\n 10\n${p.x.toFixed(3)}\n 20\n${(-p.y).toFixed(3)}\n`);
         d += "  0\nSEQEND\n";
     }
 
-    // --- 各調査データ（Survey_Data） ---
     allPaths.forEach(i => {
-        const c = getColorNum(i.color);
-        const layer = "Survey_Data";
-        
+        const c = cm[i.color] || 7;
         if (i.points && i.points.length > 1) {
-            d += `  0\nPOLYLINE\n  8\n${layer}\n 62\n ${c}\n 66\n 1\n`;
-            i.points.forEach(p => d += `  0\nVERTEX\n  8\n${layer}\n 10\n${p.x.toFixed(3)}\n 20\n${(-p.y).toFixed(3)}\n`);
+            d += `  0\nPOLYLINE\n  8\nSurvey_Data\n 62\n ${c}\n 66\n 1\n`;
+            i.points.forEach(p => d += `  0\nVERTEX\n  8\nSurvey_Data\n 10\n${p.x.toFixed(3)}\n 20\n${(-p.y).toFixed(3)}\n`);
             d += "  0\nSEQEND\n";
         } else if (i.type) {
             const r = 7.0; 
             if (i.type === 'stamp-circle' || i.type === 'stamp-double') {
-                d += `  0\nCIRCLE\n  8\n${layer}\n 62\n ${c}\n 10\n${i.x.toFixed(3)}\n 20\n${(-i.y).toFixed(3)}\n 40\n${r}\n`;
+                d += `  0\nCIRCLE\n  8\nSurvey_Data\n 62\n ${c}\n 10\n${i.x.toFixed(3)}\n 20\n${(-i.y).toFixed(3)}\n 40\n${r}\n`;
             }
             if (i.type === 'stamp-double') {
-                d += `  0\nCIRCLE\n  8\n${layer}\n 62\n ${c}\n 10\n${i.x.toFixed(3)}\n 20\n${(-i.y).toFixed(3)}\n 40\n${(r*0.6).toFixed(3)}\n`;
+                d += `  0\nCIRCLE\n  8\nSurvey_Data\n 62\n ${c}\n 10\n${i.x.toFixed(3)}\n 20\n${(-i.y).toFixed(3)}\n 40\n${(r*0.6).toFixed(3)}\n`;
             }
             if (i.type === 'stamp-dot') {
-                // ● 塗りつぶし: AutoCADの「HATCH」を使用して円形に塗りつぶす
-                // まず外枠の円を定義
-                d += `  0\nCIRCLE\n  8\n${layer}\n 62\n ${c}\n 10\n${i.x.toFixed(3)}\n 20\n${(-i.y).toFixed(3)}\n 40\n${r}\n`;
-                
-                // 次にその中身をHATCH（SOLIDパターン）で埋める
-                d += `  0\nHATCH\n  8\n${layer}\n 62\n ${c}\n  2\nSOLID\n 70\n 1\n 71\n 0\n 91\n 1\n`;
-                d += ` 92\n 1\n 93\n 1\n 72\n 1\n 10\n${i.x.toFixed(3)}\n 20\n${(-i.y).toFixed(3)}\n 40\n${r}\n 73\n 0\n 74\n 0\n`;
-                d += `210\n 0.0\n220\n 0.0\n230\n 1.0\n 75\n 1\n 76\n 1\n 98\n 1\n 10\n0.0\n 20\n0.0\n`;
+                d += `  0\nCIRCLE\n  8\nSurvey_Data\n 62\n ${c}\n 10\n${i.x.toFixed(3)}\n 20\n${(-i.y).toFixed(3)}\n 40\n${r}\n`;
+                d += `  0\nHATCH\n  8\nSurvey_Data\n 62\n ${c}\n  2\nSOLID\n 70\n 1\n 71\n 0\n 91\n 1\n 92\n 1\n 93\n 1\n 72\n 1\n 10\n${i.x.toFixed(3)}\n 20\n${(-i.y).toFixed(3)}\n 40\n${r}\n 73\n 0\n 74\n 0\n210\n 0.0\n220\n 0.0\n230\n 1.0\n 75\n 1\n 76\n 1\n 98\n 1\n 10\n0.0\n 20\n0.0\n`;
             }
         }
     });
-
     d += "  0\nENDSEC\n  0\nEOF";
-
-    const blob = new Blob([d], {type: "application/dxf"});
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = fn + ".dxf";
-    a.click();
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([d], {type:"application/dxf"}));
+    a.download = fn + ".dxf"; a.click();
 }
 
 function undo() { if (allPaths.length > 0) { allPaths.pop(); render(); } }
@@ -444,13 +385,14 @@ function exportImageWithWindow() {
     });
     octx.restore();
     const fn = askFilename("survey_map");
+    if (!fn) return;
     const a = document.createElement('a'); a.href = offCanvas.toDataURL("image/png");
     a.download = fn + ".png"; a.click();
 }
 
 function exportProjectJSON() {
     const fn = askFilename("project");
-    if (!fn) return; // ★追加：キャンセルならここで終了
+    if (!fn) return;
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({map:mapImage.src, paths:allPaths})], {type:"application/json"}));
     a.download = fn + ".json"; a.click();
 }
