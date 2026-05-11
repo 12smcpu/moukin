@@ -3,393 +3,228 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>猛禽類調査野帳 - Final Stable</title>
+    <title>猛禽類調査野帳 - Standard Stable</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         :root { --accent: #2563eb; --bg-panel: rgba(255, 255, 255, 0.9); --border: #e2e8f0; --text: #1e293b; }
-        body { margin: 0; overflow: hidden; background: #f1f5f9; font-family: sans-serif; position: fixed; width: 100%; height: 100%; touch-action: none; color: var(--text); }
-        #toolbar { position: fixed; top: 20px; left: 20px; z-index: 1000; background: var(--bg-panel); backdrop-filter: blur(10px); padding: 16px; border-radius: 16px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 220px; max-height: 85vh; overflow-y: auto; border: 1px solid var(--border); transition: transform 0.3s; }
-        #toolbar.hidden { transform: translateX(-280px); }
-        #toggle-btn { position: fixed; top: 20px; left: 20px; z-index: 1001; width: 44px; height: 44px; background: var(--accent); color: white; border: none; border-radius: 12px; cursor: pointer; font-size: 20px; display: flex; align-items: center; justify-content: center; }
-        #start-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(8px); z-index: 9999; display: flex; align-items: center; justify-content: center; }
-        .start-card { background: white; padding: 32px; border-radius: 20px; width: 90%; max-width: 400px; text-align: center; }
-        .start-card input, .start-card select { width: 100%; padding: 12px; margin: 8px 0; border: 2px solid var(--border); border-radius: 8px; font-size: 16px; box-sizing: border-box; }
-        .start-card button { width: 100%; padding: 12px; background: var(--accent); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-bottom: 8px; }
-        .btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-        button { padding: 10px 8px; cursor: pointer; border: 1px solid var(--border); background: #fff; border-radius: 8px; font-size: 12px; }
-        button.active { background: var(--accent); color: white; border-color: var(--accent); }
-        #colorPicker { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
-        .color-btn { width: 26px; height: 26px; border-radius: 8px; cursor: pointer; border: 2px solid transparent; }
-        .color-btn.selected { border-color: #fff; box-shadow: 0 0 0 2px var(--accent); }
-        .section-title { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; }
-        canvas { display: block; background: transparent; }
+        body { margin: 0; overflow: hidden; background: #f1f5f9; font-family: sans-serif; position: fixed; width: 100%; height: 100%; touch-action: none; }
+        #toolbar { position: fixed; top: 15px; left: 15px; z-index: 1000; background: var(--bg-panel); backdrop-filter: blur(8px); padding: 12px; border-radius: 12px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 180px; border: 1px solid var(--border); transition: 0.3s; }
+        #toolbar.hidden { transform: translateX(-220px); }
+        #toggle-btn { position: fixed; top: 15px; left: 15px; z-index: 1001; width: 40px; height: 40px; background: var(--accent); color: white; border: none; border-radius: 8px; cursor: pointer; }
+        #start-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 9999; display: flex; align-items: center; justify-content: center; color: white; }
+        .start-card { background: white; padding: 25px; border-radius: 15px; width: 300px; color: #333; }
+        button { padding: 8px; cursor: pointer; border: 1px solid #ccc; background: #fff; border-radius: 5px; font-size: 13px; }
+        button.active { background: var(--accent); color: white; }
+        canvas { display: block; touch-action: none; }
     </style>
 </head>
 <body>
 
 <div id="start-overlay">
     <div class="start-card">
-        <h2>調査野帳 開始</h2>
-        <input type="text" id="project-name-input" placeholder="調査名（例: 飛翔調査01）">
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:15px;">
-            <select id="paper-size"><option value="A3">A3</option><option value="A4">A4</option></select>
-            <select id="paper-orient"><option value="LANDSCAPE">横向き</option><option value="PORTRAIT">縦向き</option></select>
-        </div>
-        <button onclick="startProject()">新規開始</button>
-        <button onclick="document.getElementById('importFile').click()" style="background: #64748b;">一括読込 (.zip)</button>
-        <div id="resume-area" style="display:none; margin-top:10px; border-top:1px solid #eee; padding-top:10px;">
-            <button onclick="resumeLastSession()" style="background:#10b981;">直前の続きから再開</button>
-        </div>
+        <h3>新規調査開始</h3>
+        <input type="text" id="project-name" placeholder="プロジェクト名" style="width:100%; margin-bottom:10px; padding:8px; box-sizing:border-box;">
+        <select id="paper-size" style="width:100%; margin-bottom:15px; padding:8px;"><option value="A3">A3 (横)</option><option value="A4">A4 (横)</option></select>
+        <button onclick="startApp()" style="width:100%; background:var(--accent); color:white;">開始</button>
     </div>
 </div>
 
-<button id="toggle-btn" onclick="toggleToolbar()">☰</button>
+<button id="toggle-btn" onclick="document.getElementById('toolbar').classList.toggle('hidden')">☰</button>
 
 <div id="toolbar">
-    <div class="section">
-        <div class="section-title">Project</div>
-        <button onclick="exportAllAsZip()" style="background: #10b981; color: white; font-weight: bold; width:100%;">📦 一括保存 (ZIP)</button>
-        <div class="btn-group" style="margin-top:5px;">
-            <button onclick="document.getElementById('importFile').click()">📂 読込</button>
-            <button onclick="undo()">↩️ 戻る</button>
-        </div>
-        <input type="file" id="importFile" accept=".zip" style="display:none" onchange="handleImport(this)">
+    <button onclick="exportZip()" style="background:#10b981; color:white;">保存 (ZIP)</button>
+    <button onclick="undo()">↩ 戻る</button>
+    <button onclick="resetView()">位置リセット</button>
+    <hr style="width:100%; border:0; border-top:1px solid #eee;">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:5px;">
+        <button id="btn-draw" class="active" onclick="setMode('draw')">ペン</button>
+        <button id="btn-erase" onclick="setMode('erase')">消ゴム</button>
     </div>
-    <div class="section">
-        <div class="section-title">Basemap</div>
-        <button onclick="document.getElementById('mapInput').click()" style="width:100%;">🗺️ 地図画像を登録</button>
-        <input type="file" id="mapInput" accept="image/*" style="display:none">
-        <button onclick="resetView()" style="width:100%; margin-top:4px;">表示位置リセット</button>
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:5px;">
+        <button id="btn-s1" onclick="setMode('stamp-circle')">〇</button>
+        <button id="btn-s2" onclick="setMode('stamp-dot')">●</button>
+        <button id="btn-s3" onclick="setMode('stamp-double')">◎</button>
     </div>
-    <div class="section">
-        <div class="section-title">Tools</div>
-        <div class="btn-group">
-            <button id="btn-draw" class="active" onclick="setMode('draw')">✏️ ペン</button>
-            <button id="btn-erase" onclick="setMode('erase')">🧹 消ゴム</button>
-            <button id="btn-window" onclick="setMode('window')">🖼️ 範囲</button>
-        </div>
-    </div>
-    <div class="section">
-        <div class="section-title">Stamps</div>
-        <div class="btn-group" style="grid-template-columns: 1fr 1fr 1fr;">
-            <button id="btn-s1" onclick="setMode('stamp-circle')">〇</button>
-            <button id="btn-s2" onclick="setMode('stamp-dot')">●</button>
-            <button id="btn-s3" onclick="setMode('stamp-double')">◎</button>
-        </div>
-    </div>
-    <div id="colorPicker"></div>
+    <input type="file" id="map-input" accept="image/*" style="font-size:10px;">
 </div>
 
-<canvas id="viewport"></canvas>
+<canvas id="mainCanvas"></canvas>
 
 <script>
-// --- ステート設定 ---
-const PAPER_CONFIG = { A3: { w: 1587, h: 1123 }, A4: { w: 1123, h: 794 } };
-let currentPaper = { w: 1587, h: 1123 };
-let mapImage = new Image(), allPaths = [], currentPath = null;
-let mode = 'draw', currentColor = '#ef4444', view = { x: 50, y: 50, scale: 0.5 };
-let lastPointers = [], isPanning = false, needsRender = true, isVisible = true;
-let windowStart = null, windowRect = null, projectName = "";
-let currentMousePos = null, saveTimer = null, pointerMoved = false;
-
-const canvas = document.getElementById('viewport');
+const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
+const PAPER = { A3: {w: 1587, h: 1123}, A4: {w: 1123, h: 794} };
+let config = { w: 1587, h: 1123 }, projectName = "";
+let view = { x: 50, y: 50, scale: 0.5 };
+let allPaths = [], currentPath = null;
+let mode = 'draw', pointers = [], isPanning = false;
+let mapImg = new Image(), mousePos = {x:0, y:0};
 
-// --- 描画ループ管理 ---
-function requestRender() { needsRender = true; }
-function renderLoop() { if (isVisible && needsRender) { render(); needsRender = false; } requestAnimationFrame(renderLoop); }
-
-// --- 初期化 ---
 function init() {
+    window.addEventListener('resize', resize);
     resize();
-    createColorButtons();
-    window.addEventListener('resize', () => { resize(); requestRender(); });
-    document.addEventListener('visibilitychange', () => { isVisible = !document.hidden; });
-    if(localStorage.getItem('field_note_meta')) document.getElementById('resume-area').style.display = 'block';
-    requestAnimationFrame(renderLoop);
+    render();
 }
 
-// --- IndexedDB ---
-const dbName = "FieldNoteDB", storeName = "AutoSave";
-async function openDB() {
-    return new Promise((resolve, reject) => {
-        let request = indexedDB.open(dbName, 1);
-        request.onupgradeneeded = e => e.target.result.createObjectStore(storeName);
-        request.onsuccess = e => resolve(e.target.result);
-        request.onerror = e => reject(e.target.error);
-    });
-}
-async function saveToDB(key, data) {
-    try {
-        const db = await openDB();
-        const tx = db.transaction(storeName, "readwrite");
-        tx.objectStore(storeName).put(data, key);
-    } catch(e) { console.warn("Save failed", e); }
-}
-async function getFromDB(key) {
-    try {
-        const db = await openDB();
-        return new Promise(resolve => {
-            let req = db.transaction(storeName).objectStore(storeName).get(key);
-            req.onsuccess = () => resolve(req.result);
-            req.onerror = () => resolve(null);
-        });
-    } catch(e) { return null; }
+function resize() {
+    canvas.width = window.innerWidth * window.devicePixelRatio;
+    canvas.height = window.innerHeight * window.devicePixelRatio;
+    render();
 }
 
-// --- 座標変換 ---
-function toCanvas(sx, sy) {
-    return { x: (sx - view.x) / view.scale, y: (sy - view.y) / view.scale };
+// 用紙座標への変換（最もシンプルな逆変換）
+function getPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left);
+    const y = (e.clientY - rect.top);
+    return {
+        x: (x - view.x) / view.scale,
+        y: (y - view.y) / view.scale
+    };
 }
 
 function render() {
-    const dpr = window.devicePixelRatio || 1;
-    ctx.save();
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = "#f1f5f9"; ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+    const dpr = window.devicePixelRatio;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // リセット
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+    ctx.save();
     ctx.translate(view.x, view.y);
     ctx.scale(view.scale, view.scale);
 
-    // 用紙本体
-    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, currentPaper.w, currentPaper.h);
-    
-    // 背景画像 (アスペクト維持して中央配置)
-    if (mapImage.complete && mapImage.naturalWidth > 0) {
-        const s = Math.min(currentPaper.w/mapImage.naturalWidth, currentPaper.h/mapImage.naturalHeight);
-        ctx.drawImage(mapImage, (currentPaper.w-mapImage.naturalWidth*s)/2, (currentPaper.h-mapImage.naturalHeight*s)/2, mapImage.naturalWidth*s, mapImage.naturalHeight*s);
-    }
-    
-    // 描画済みパス
-    allPaths.forEach(i => drawCore(ctx, i));
-    
-    // 描画中パス
-    if (currentPath) drawCore(ctx, currentPath);
+    // 用紙
+    ctx.fillStyle = "white";
+    ctx.fillRect(0, 0, config.w, config.h);
+    ctx.strokeStyle = "#ccc";
+    ctx.strokeRect(0, 0, config.w, config.h);
 
-    // スタンププレビュー（ゴースト）
-    if (mode.startsWith('stamp') && currentMousePos && !isPanning) {
-        const pt = toCanvas(currentMousePos.x, currentMousePos.y);
-        drawCore(ctx, {type: mode, x: pt.x, y: pt.y, color: currentColor}, 0.5);
+    // 地図
+    if (mapImg.src) {
+        const s = Math.min(config.w/mapImg.naturalWidth, config.h/mapImg.naturalHeight);
+        ctx.drawImage(mapImg, (config.w-mapImg.naturalWidth*s)/2, (config.h-mapImg.naturalHeight*s)/2, mapImg.naturalWidth*s, mapImg.naturalHeight*s);
     }
-    
-    // 範囲選択枠
-    if (mode === 'window' && windowRect) {
-        ctx.strokeStyle = "rgba(37, 99, 235, 0.8)"; ctx.lineWidth = 2/view.scale; ctx.setLineDash([5/view.scale, 5/view.scale]);
-        ctx.strokeRect(windowRect.x, windowRect.y, windowRect.w, windowRect.h);
+
+    // 描画
+    allPaths.forEach(p => drawItem(ctx, p));
+    if (currentPath) drawItem(ctx, currentPath);
+
+    // ゴースト
+    if (mode.startsWith('stamp') && !isPanning) {
+        const pt = getPos({clientX: mousePos.x, clientY: mousePos.y});
+        ctx.globalAlpha = 0.5;
+        drawItem(ctx, {type: mode, x: pt.x, y: pt.y, color: "red"});
+        ctx.globalAlpha = 1.0;
     }
     ctx.restore();
 }
 
-function drawCore(targetCtx, item, alpha = 1) {
-    targetCtx.save();
-    targetCtx.globalAlpha = alpha;
-    targetCtx.strokeStyle = targetCtx.fillStyle = item.color;
-    targetCtx.lineWidth = 2;
-    targetCtx.lineCap = targetCtx.lineJoin = "round";
-    
-    if (item.type && item.type.startsWith('stamp')) {
-        const r = 7;
-        targetCtx.beginPath(); targetCtx.arc(item.x, item.y, r, 0, Math.PI*2);
-        item.type === 'stamp-dot' ? targetCtx.fill() : targetCtx.stroke();
+function drawItem(tCtx, item) {
+    tCtx.beginPath();
+    tCtx.strokeStyle = tCtx.fillStyle = item.color || "red";
+    tCtx.lineWidth = 2;
+    if (item.points) {
+        tCtx.moveTo(item.points[0].x, item.points[0].y);
+        item.points.forEach(pt => tCtx.lineTo(pt.x, pt.y));
+        tCtx.stroke();
+    } else {
+        tCtx.arc(item.x, item.y, 7, 0, Math.PI*2);
+        item.type === 'stamp-dot' ? tCtx.fill() : tCtx.stroke();
         if (item.type === 'stamp-double') {
-            targetCtx.beginPath(); targetCtx.arc(item.x, item.y, r*0.6, 0, Math.PI*2); targetCtx.stroke();
+            tCtx.beginPath(); tCtx.arc(item.x, item.y, 4, 0, Math.PI*2); tCtx.stroke();
         }
-    } else if (item.points && item.points.length > 0) {
-        targetCtx.beginPath();
-        targetCtx.moveTo(item.points[0].x, item.points[0].y);
-        for(let i=1; i<item.points.length; i++) targetCtx.lineTo(item.points[i].x, item.points[i].y);
-        targetCtx.stroke();
     }
-    targetCtx.restore();
 }
 
-// --- 入力制御 ---
-window.addEventListener('pointermove', e => {
-    currentMousePos = { x: e.clientX, y: e.clientY };
-    const idx = lastPointers.findIndex(p => p.pointerId === e.pointerId);
-    if (idx !== -1) {
-        const oldPointers = [...lastPointers]; lastPointers[idx] = e;
-        const pt = toCanvas(e.clientX, e.clientY);
-        if (Math.hypot(e.clientX - oldPointers[idx].clientX, e.clientY - oldPointers[idx].clientY) > 2) pointerMoved = true;
-
-        if (isPanning) {
-            if (lastPointers.length >= 2) {
-                const p1o = oldPointers[0], p2o = oldPointers[1], p1n = lastPointers[0], p2n = lastPointers[1];
-                const do_ = Math.hypot(p1o.clientX - p2o.clientX, p1o.clientY - p2o.clientY);
-                const dn = Math.hypot(p1n.clientX - p2n.clientX, p1n.clientY - p2n.clientY);
-                if (do_ > 0) {
-                    const ratio = dn / do_;
-                    view.x = e.clientX - (e.clientX - view.x) * ratio;
-                    view.y = e.clientY - (e.clientY - view.y) * ratio;
-                    view.scale *= ratio;
-                }
-            } else {
-                view.x += e.clientX - oldPointers[idx].clientX;
-                view.y += e.clientY - oldPointers[idx].clientY;
-            }
-        } else if (mode === 'window' && windowStart) {
-            windowRect = { x: Math.min(windowStart.x, pt.x), y: Math.min(windowStart.y, pt.y), w: Math.abs(pt.x - windowStart.x), h: Math.abs(pt.y - windowStart.y) };
-        } else if (currentPath) {
-            // ポイントの間引き処理 (1.5px以上動いた場合のみ記録)
-            const last = currentPath.points[currentPath.points.length - 1];
-            if (!last || Math.hypot(last.x - pt.x, last.y - pt.y) > 1.5) {
-                currentPath.points.push(pt);
-            }
-        }
-        requestRender();
-    }
-});
-
+// --- イベント ---
 canvas.addEventListener('pointerdown', e => {
-    lastPointers.push(e); pointerMoved = false;
-    const pt = toCanvas(e.clientX, e.clientY);
-    if (e.button === 2 || lastPointers.length > 1) { isPanning = true; currentPath = null; return; }
-    if (mode === 'window') { windowStart = pt; windowRect = null; return; }
-    if (pt.x < 0 || pt.x > currentPaper.w || pt.y < 0 || pt.y > currentPaper.h) { isPanning = true; return; }
-    
-    if (mode === 'draw') currentPath = {points: [pt], color: currentColor};
-    else if (mode === 'erase') {
-        allPaths = allPaths.filter(i => {
-            const hit = i.points ? i.points.some(p => Math.hypot(p.x-pt.x, p.y-pt.y) < 15/view.scale) : Math.hypot(i.x-pt.x, i.y-pt.y) < 15/view.scale;
+    pointers.push(e);
+    const pt = getPos(e);
+    if (e.button === 2 || pointers.length > 1) {
+        isPanning = true;
+        currentPath = null;
+    } else if (mode === 'draw') {
+        currentPath = { points: [pt], color: "red" };
+    } else if (mode === 'erase') {
+        allPaths = allPaths.filter(p => {
+            const hit = p.points ? p.points.some(d => Math.hypot(d.x-pt.x, d.y-pt.y) < 15/view.scale) : Math.hypot(p.x-pt.x, p.y-pt.y) < 15/view.scale;
             return !hit;
         });
-        queueAutosave();
     }
-    requestRender();
+    render();
 });
 
-const handleUp = (e) => {
-    const pt = toCanvas(e.clientX, e.clientY);
-    if (lastPointers.length === 1 && !isPanning && !pointerMoved && mode.startsWith('stamp')) {
-        if (pt.x >= 0 && pt.x <= currentPaper.w && pt.y >= 0 && pt.y <= currentPaper.h) {
-            allPaths.push({type: mode, x: pt.x, y: pt.y, color: currentColor});
-            queueAutosave();
-        }
+window.addEventListener('pointermove', e => {
+    mousePos = {x: e.clientX, y: e.clientY};
+    const idx = pointers.findIndex(p => p.pointerId === e.pointerId);
+    if (idx === -1) { render(); return; }
+    
+    const prev = pointers[idx];
+    const pt = getPos(e);
+    
+    if (isPanning) {
+        view.x += e.clientX - prev.clientX;
+        view.y += e.clientY - prev.clientY;
+    } else if (currentPath) {
+        const last = currentPath.points[currentPath.points.length-1];
+        if (Math.hypot(last.x - pt.x, last.y - pt.y) > 2) currentPath.points.push(pt);
     }
-    lastPointers = lastPointers.filter(p => p.pointerId !== e.pointerId);
-    if (lastPointers.length === 0) {
-        if (currentPath) { allPaths.push(currentPath); currentPath = null; queueAutosave(); }
-        isPanning = false; windowStart = null;
-    }
-    requestRender();
-};
-window.addEventListener('pointerup', handleUp);
-window.addEventListener('pointercancel', handleUp);
+    pointers[idx] = e;
+    render();
+});
 
-// --- システム機能 ---
-function queueAutosave() {
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(async () => {
-        localStorage.setItem('field_note_meta', JSON.stringify({ projectName, paths: allPaths, paperSize: currentPaper }));
-        if (mapImage.src.startsWith('data:')) await saveToDB("lastMap", mapImage.src);
-    }, 1500);
-}
-
-async function resumeLastSession() {
-    const meta = JSON.parse(localStorage.getItem('field_note_meta'));
-    if(!meta) return;
-    projectName = meta.projectName; allPaths = meta.paths; currentPaper = meta.paperSize;
-    const imgData = await getFromDB("lastMap");
-    if(imgData) {
-        const oldUrl = mapImage.src; mapImage = new Image();
-        mapImage.onload = () => { if(oldUrl.startsWith('blob:')) URL.revokeObjectURL(oldUrl); resetView(); requestRender(); };
-        mapImage.src = imgData;
+window.addEventListener('pointerup', e => {
+    if (pointers.length === 1 && !isPanning && mode.startsWith('stamp')) {
+        const pt = getPos(e);
+        allPaths.push({type: mode, x: pt.x, y: pt.y, color: "red"});
     }
-    document.getElementById('start-overlay').style.display = 'none';
+    if (currentPath) allPaths.push(currentPath);
+    currentPath = null;
+    pointers = pointers.filter(p => p.pointerId !== e.pointerId);
+    if (pointers.length === 0) isPanning = false;
+    render();
+});
+
+canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    const pt = getPos(e);
+    view.scale *= delta;
+    view.x = e.clientX - pt.x * view.scale;
+    view.y = e.clientY - pt.y * view.scale;
+    render();
+}, {passive: false});
+
+// --- 管理 ---
+function startApp() {
+    projectName = document.getElementById('project-name').value || "Survey";
+    config = PAPER[document.getElementById('paper-size').value];
+    document.getElementById('start-overlay').style.display = "none";
     resetView();
+    init();
 }
-
-async function exportAllAsZip() {
-    const zip = new JSZip();
-    const date = new Date().toISOString().replace(/[:T]/g, '').slice(0, 14);
-    const baseName = `${projectName}_${date}`;
-    zip.file(`data.json`, JSON.stringify({projectName, paths:allPaths, paperSize:currentPaper}));
-    if (mapImage.src.startsWith('data:')) zip.file(`basemap.png`, mapImage.src.split(',')[1], {base64: true});
-
-    // DXF (Y軸反転のみ)
-    const dxf = ["  0\nSECTION\n  2\nENTITIES\n"];
-    allPaths.forEach(i => {
-        if (i.points) {
-            dxf.push("  0\nPOLYLINE\n  8\n0\n 66\n 1\n 70\n 0\n");
-            i.points.forEach(p => dxf.push(`  0\nVERTEX\n  8\n0\n 10\n${p.x}\n 20\n${-p.y}\n`));
-            dxf.push("  0\nSEQEND\n");
-        } else if (i.type.startsWith('stamp')) {
-            dxf.push(`  0\nCIRCLE\n  8\n0\n 10\n${i.x}\n 20\n${-i.y}\n 40\n7.0\n`);
-        }
-    });
-    dxf.push("  0\nENDSEC\n  0\nEOF");
-    zip.file(`${baseName}.dxf`, dxf.join(''));
-
-    const blob = await zip.generateAsync({type:"blob"});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = `${baseName}.zip`; a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 3000);
+function resetView() {
+    view = { x: 50, y: 50, scale: Math.min((window.innerWidth-100)/config.w, (window.innerHeight-100)/config.h) };
+    render();
 }
-
-async function handleImport(input) {
-    const file = input.files[0]; if (!file) return;
-    try {
-        const zip = await JSZip.loadAsync(file);
-        const d = JSON.parse(await zip.file("data.json").async("string"));
-        projectName = d.projectName; allPaths = d.paths; currentPaper = d.paperSize;
-        const imgFile = zip.file("basemap.png");
-        if (imgFile) {
-            const oldUrl = mapImage.src; const imgBlob = await imgFile.async("blob");
-            mapImage = new Image();
-            mapImage.onload = () => { if(oldUrl.startsWith('blob:')) URL.revokeObjectURL(oldUrl); resetView(); requestRender(); };
-            mapImage.src = URL.createObjectURL(imgBlob);
-        }
-        document.getElementById('start-overlay').style.display = 'none';
-        resetView();
-    } catch(e) { alert("読込失敗"); }
-}
-
-function startProject() {
-    projectName = document.getElementById('project-name-input').value.trim() || "survey";
-    const size = document.getElementById('paper-size').value, orient = document.getElementById('paper-orient').value;
-    const base = PAPER_CONFIG[size]; currentPaper = (orient === 'PORTRAIT') ? { w: base.h, h: base.w } : { w: base.w, h: base.h };
-    document.getElementById('start-overlay').style.display = 'none';
-    resetView();
-}
-
-function undo() { if(allPaths.length > 0) { allPaths.pop(); queueAutosave(); requestRender(); } }
-
 function setMode(m) {
     mode = m;
     document.querySelectorAll('#toolbar button').forEach(b => b.classList.remove('active'));
-    // ボタンIDへのマッピング
-    const map = { draw:'btn-draw', erase:'btn-erase', window:'btn-window', 'stamp-circle':'btn-s1', 'stamp-dot':'btn-s2', 'stamp-double':'btn-s3' };
-    if(map[m]) document.getElementById(map[m]).classList.add('active');
-    requestRender();
+    const btnId = { draw:'btn-draw', erase:'btn-erase', 'stamp-circle':'btn-s1', 'stamp-dot':'btn-s2', 'stamp-double':'btn-s3' }[m];
+    if(btnId) document.getElementById(btnId).classList.add('active');
+    render();
 }
-
-function resize() {
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = window.innerWidth * dpr; canvas.height = window.innerHeight * dpr;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-}
-function resetView() { view = { x: 50, y: 50, scale: Math.min((window.innerWidth-100)/currentPaper.w, (window.innerHeight-100)/currentPaper.h) }; requestRender(); }
-function toggleToolbar() { document.getElementById('toolbar').classList.toggle('hidden'); }
-function createColorButtons() {
-    const cp = document.getElementById('colorPicker'); cp.innerHTML = '';
-    ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#0f172a'].forEach(c => {
-        const b = document.createElement('div'); b.className = 'color-btn' + (c === currentColor ? ' selected' : '');
-        b.style.background = c; b.onclick = () => { currentColor = c; createColorButtons(); requestRender(); };
-        cp.appendChild(b);
-    });
-}
-document.getElementById('mapInput').onchange = e => {
-    const r = new FileReader(); r.onload = f => { 
-        const oldUrl = mapImage.src; mapImage = new Image(); 
-        mapImage.onload = () => { if(oldUrl.startsWith('blob:')) URL.revokeObjectURL(oldUrl); resetView(); requestRender(); queueAutosave(); };
-        mapImage.src = f.target.result; 
-    };
-    if(e.target.files[0]) r.readAsDataURL(e.target.files[0]);
+function undo() { allPaths.pop(); render(); }
+document.getElementById('map-input').onchange = e => {
+    const reader = new FileReader();
+    reader.onload = f => { mapImg.src = f.target.result; mapImg.onload = render; };
+    reader.readAsDataURL(e.target.files[0]);
 };
-canvas.addEventListener('wheel', e => { e.preventDefault(); const delta = e.deltaY > 0 ? 0.9 : 1.1; view.x = e.clientX - (e.clientX - view.x) * delta; view.y = e.clientY - (e.clientY - view.y) * delta; view.scale *= delta; requestRender(); }, { passive: false });
-
-// 起動
-init();
+async function exportZip() {
+    const zip = new JSZip();
+    zip.file("data.json", JSON.stringify({allPaths, config}));
+    const blob = await zip.generateAsync({type:"blob"});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = projectName+".zip"; a.click();
+}
 </script>
 </body>
 </html>
