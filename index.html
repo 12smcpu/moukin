@@ -3,66 +3,128 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>調査野帳 - Stable Integrated</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <title>猛禽類調査野帳プロトタイプ</title>
     <style>
-        :root { --accent: #2563eb; --bg-panel: rgba(255, 255, 255, 0.95); --border: #e2e8f0; --text: #1e293b; }
-        body { margin: 0; overflow: hidden; background: #f1f5f9; font-family: sans-serif; position: fixed; width: 100%; height: 100%; touch-action: none; color: var(--text); }
-        #toolbar { position: fixed; top: 15px; left: 15px; z-index: 1000; background: var(--bg-panel); backdrop-filter: blur(8px); padding: 15px; border-radius: 12px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); width: 200px; border: 1px solid var(--border); transition: 0.3s; max-height: 90vh; overflow-y: auto; }
-        #toolbar.hidden { transform: translateX(-240px); }
-        #toggle-btn { position: fixed; top: 15px; left: 15px; z-index: 1001; width: 44px; height: 44px; background: var(--accent); color: white; border: none; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 20px; }
-        #start-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.9); z-index: 9999; display: flex; align-items: center; justify-content: center; }
-        .start-card { background: white; padding: 30px; border-radius: 20px; width: 90%; max-width: 350px; }
+        :root { 
+            --accent: #2563eb; 
+            --bg-panel: rgba(255, 255, 255, 0.9);
+            --border: #e2e8f0;
+            --text: #1e293b;
+        }
+        body { 
+            margin: 0; overflow: hidden; background: #f1f5f9; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            position: fixed; width: 100%; height: 100%; touch-action: none; 
+        }
+        
+        #toolbar { 
+            position: fixed; top: 20px; left: 20px; z-index: 1000; 
+            background: var(--bg-panel); backdrop-filter: blur(10px);
+            padding: 16px; border-radius: 16px; display: flex; flex-direction: column; gap: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 220px; 
+            max-height: 85vh; overflow-y: auto; border: 1px solid var(--border);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        #toolbar.hidden { transform: translateX(-260px); opacity: 0; }
+
+        #toggle-btn {
+            position: fixed; top: 20px; left: 20px; z-index: 1001;
+            width: 44px; height: 44px; background: var(--accent); color: white;
+            border: none; border-radius: 12px; cursor: pointer; font-size: 20px;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        #start-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(8px);
+            z-index: 9999; display: flex; align-items: center; justify-content: center;
+        }
+        .start-card {
+            background: white; padding: 32px; border-radius: 20px;
+            width: 90%; max-width: 400px; text-align: center; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+        }
+        .start-card h2 { margin-top: 0; color: var(--text); }
+        .start-card input {
+            width: 100%; padding: 12px; margin: 15px 0; border: 2px solid var(--border);
+            border-radius: 8px; font-size: 16px; box-sizing: border-box;
+        }
+        .start-card button {
+            width: 100%; padding: 12px; background: var(--accent); color: white;
+            border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-bottom: 10px;
+        }
+
+        .section { display: flex; flex-direction: column; gap: 6px; }
+        .section-title { font-size: 11px; font-weight: 700; color: #64748b; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 2px; }
         .btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-        button { padding: 10px 5px; cursor: pointer; border: 1px solid var(--border); background: #fff; border-radius: 8px; font-size: 13px; }
-        button.active { background: var(--accent); color: white; border-color: var(--accent); }
-        #colorPicker { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 5px; }
-        .color-btn { width: 28px; height: 28px; border-radius: 6px; cursor: pointer; border: 2px solid transparent; }
-        .color-btn.selected { border-color: #000; box-shadow: 0 0 0 2px var(--accent); }
-        .section-title { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 4px; }
-        canvas { display: block; background: transparent; }
+        .btn-group.triple { grid-template-columns: 1fr 1fr 1fr; }
+
+        button { 
+            padding: 10px 8px; cursor: pointer; border: 1px solid var(--border); 
+            background: #fff; border-radius: 8px; font-size: 12px; font-weight: 500;
+            color: var(--text); transition: all 0.2s;
+            display: flex; align-items: center; justify-content: center; gap: 4px;
+        }
+        button:hover { background: #f8fafc; border-color: #cbd5e1; }
+        button.active { background: var(--accent); color: white; border-color: var(--accent); box-shadow: 0 4px 10px rgba(37, 99, 235, 0.2); }
+
+        #colorPicker { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 0; }
+        .color-btn { width: 26px; height: 26px; border-radius: 8px; border: 2px solid transparent; cursor: pointer; transition: transform 0.2s; }
+        .color-btn.selected { transform: scale(1.2); border-color: #fff; box-shadow: 0 0 0 2px var(--accent); }
+
+        canvas { display: block; background: transparent; cursor: crosshair; }
+        .file-label { font-size: 11px; background: #f1f5f9; padding: 8px; border-radius: 8px; border: 1px dashed #cbd5e1; text-align: center; cursor: pointer; }
     </style>
 </head>
 <body>
 
 <div id="start-overlay">
     <div class="start-card">
-        <h2 style="margin-top:0">調査野帳 開始</h2>
-        <input type="text" id="project-input" placeholder="調査名" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ccc; border-radius:5px; box-sizing:border-box;">
-        <select id="paper-size-select" style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ccc; border-radius:5px;">
-            <option value="A3">A3 (横向き)</option>
-            <option value="A4">A4 (横向き)</option>
-        </select>
-        <button onclick="startApp()" style="width:100%; background:var(--accent); color:white; font-weight:bold; margin-bottom:10px;">新規開始</button>
-        <div id="resume-area" style="display:none; border-top:1px solid #eee; pt:10px;">
-            <button onclick="resumeApp()" style="width:100%; background:#10b981; color:white; margin-top:10px;">前回の続きから再開</button>
+        <h2>調査開始</h2>
+        <p style="color: #64748b; font-size: 14px;">新規プロジェクト名を入力</p>
+        <input type="text" id="project-name-input" placeholder="例: 〇〇地区 猛禽類調査">
+        <button onclick="startProject()">新規開始</button>
+        <div style="margin: 15px 0; border-top: 1px solid #e2e8f0; padding-top: 15px;">
+            <p style="color: #64748b; font-size: 14px;">または既存ファイルから再開</p>
+            <button onclick="document.getElementById('importFile').click()" style="background: #64748b;">ファイルを選択</button>
         </div>
     </div>
 </div>
 
-<button id="toggle-btn" onclick="document.getElementById('toolbar').classList.toggle('hidden')">☰</button>
+<button id="toggle-btn" onclick="toggleToolbar()">☰</button>
 
 <div id="toolbar">
     <div class="section">
         <div class="section-title">Project</div>
-        <button onclick="exportZip()" style="width:100%; background:#10b981; color:white; font-weight:bold;">📦 保存 (ZIP)</button>
-        <div class="btn-group" style="margin-top:5px;">
-            <button onclick="undo()">↩ 戻る</button>
-            <button onclick="resetView()">リセット</button>
-        </div>
-    </div>
-
-    <div class="section">
-        <div class="section-title">Tools</div>
         <div class="btn-group">
-            <button id="btn-draw" class="active" onclick="setMode('draw')">ペン</button>
-            <button id="btn-erase" onclick="setMode('erase')">消しゴム</button>
+            <button onclick="exportProjectJSON()">💾 保存</button>
+            <button onclick="document.getElementById('importFile').click()">📂 開く</button>
+        </div>
+        <input type="file" id="importFile" accept=".json" style="display:none" onchange="importProjectJSON(this)">
+    </div>
+
+    <div class="section">
+        <div class="section-title">Basemap</div>
+        <label class="file-label" for="mapInput">🗺️ 画像を選択</label>
+        <input type="file" id="mapInput" accept="image/*" style="display:none">
+        <button onclick="resetView()" style="margin-top:4px;">センター復帰</button>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Drawing Tools</div>
+        <div class="btn-group">
+            <button id="btn-draw" class="active" onclick="setMode('draw')">✏️ ペン</button>
+            <button id="btn-erase" onclick="setMode('erase')">🧹 消しゴム</button>
+        </div>
+        <div class="btn-group">
+            <button id="btn-window" onclick="setMode('window')">🖼️ 印刷窓</button>
+            <button onclick="undo()">↩️ 戻る</button>
         </div>
     </div>
 
     <div class="section">
-        <div class="section-title">Stamps</div>
-        <div class="btn-group" style="grid-template-columns: 1fr 1fr 1fr;">
+        <div class="section-title">Analysis Stamps</div>
+        <div class="btn-group triple">
             <button id="btn-s1" onclick="setMode('stamp-circle')">〇</button>
             <button id="btn-s2" onclick="setMode('stamp-dot')">●</button>
             <button id="btn-s3" onclick="setMode('stamp-double')">◎</button>
@@ -70,235 +132,292 @@
     </div>
 
     <div class="section">
-        <div class="section-title">Colors</div>
+        <div class="section-title">Color</div>
         <div id="colorPicker"></div>
     </div>
 
-    <div class="section" style="margin-top:5px;">
-        <div class="section-title">Basemap</div>
-        <input type="file" id="map-input" accept="image/*" style="font-size:10px; width:100%;">
+    <div class="section" style="margin-top: 10px; border-top: 1px solid var(--border); padding-top: 15px;">
+        <button onclick="exportDXF()" style="width:100%; margin-bottom:6px;">📐 AutoCAD用 (DXF)</button>
+        <button onclick="exportGeoJSON()" style="width:100%; margin-bottom:6px; background:#f0fdf4; color:#166534; border-color:#bbf7d0;">🌍 QGIS用 (GeoJSON)</button>
+        <button onclick="exportImageWithWindow()" style="width:100%; background:#eff6ff; color:var(--accent); border-color:#bfdbfe;">📸 PNG画像出力</button>
     </div>
 </div>
 
-<canvas id="mainCanvas"></canvas>
+<canvas id="viewport"></canvas>
 
 <script>
-const canvas = document.getElementById('mainCanvas');
+const A3_W = 1587, A3_H = 1123;
+const canvas = document.getElementById('viewport');
 const ctx = canvas.getContext('2d');
-const PAPER = { A3: {w: 1587, h: 1123}, A4: {w: 1123, h: 794} };
+let mapImage = new Image(), allPaths = [], currentPath = null;
+let mode = 'draw', currentColor = '#ef4444', view = { x: 0, y: 0, scale: 0.5 };
+let lastPointers = [], isPanning = false;
+let windowStart = null, windowRect = null;
+let projectName = ""; 
+let currentMousePos = null; // プレビュー用
 
-let config = { w: 1587, h: 1123 }, projectName = "";
-let view = { x: 50, y: 50, scale: 0.5 };
-let allPaths = [], currentPath = null;
-let mode = 'draw', currentColor = '#ef4444', pointers = [], isPanning = false;
-let mapImg = new Image(), mousePos = {x:0, y:0};
-
-// --- 初期化 & IndexedDB ---
-async function startApp() {
-    projectName = document.getElementById('project-input').value || "Survey";
-    config = PAPER[document.getElementById('paper-size-select').value];
-    document.getElementById('start-overlay').style.display = "none";
-    setup();
-}
-
-async function resumeApp() {
-    const data = JSON.parse(localStorage.getItem('field_note_save'));
-    if (data) {
-        allPaths = data.allPaths;
-        config = data.config;
-        projectName = data.projectName || "Survey";
-        if (data.mapData) mapImg.src = data.mapData;
-    }
-    document.getElementById('start-overlay').style.display = "none";
-    setup();
-}
-
-function setup() {
+function init() {
     window.addEventListener('resize', resize);
-    createColorPicker();
     resize();
-    resetView();
-    if (mapImg.src) mapImg.onload = render;
-    requestAnimationFrame(renderLoop);
+    view.x = window.innerWidth / 2;
+    view.y = window.innerHeight / 2;
+    createColorButtons();
+    canvas.addEventListener('contextmenu', e => e.preventDefault());
+    render();
 }
 
-// --- 座標計算 (Standard方式: 最も狂わない) ---
-function getPos(e) {
-    const x = e.clientX;
-    const y = e.clientY;
-    return { x: (x - view.x) / view.scale, y: (y - view.y) / view.scale };
+function startProject() {
+    const input = document.getElementById('project-name-input');
+    if (!input.value.trim()) { alert("業務名を入力してください。"); return; }
+    projectName = input.value.trim();
+    document.getElementById('start-overlay').style.display = 'none';
 }
 
-// --- 描画ロジック ---
-let needsRender = true;
-function render() { needsRender = true; }
+function getFormattedDate() {
+    const now = new Date();
+    return `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+}
 
-function renderLoop() {
-    if (needsRender) {
-        const dpr = window.devicePixelRatio || 1;
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+function exportProjectJSON() {
+    const fileName = `${projectName}_${getFormattedDate()}.json`;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify({map:mapImage.src, paths:allPaths, projectName:projectName})], {type:"application/json"}));
+    a.download = fileName;
+    a.click();
+}
 
-        ctx.save();
-        ctx.translate(view.x, view.y);
-        ctx.scale(view.scale, view.scale);
-
-        // 用紙
-        ctx.fillStyle = "white";
-        ctx.fillRect(0, 0, config.w, config.h);
-        ctx.strokeStyle = "#ccc";
-        ctx.strokeRect(0, 0, config.w, config.h);
-
-        // 背景
-        if (mapImg.complete && mapImg.naturalWidth > 0) {
-            const s = Math.min(config.w/mapImg.naturalWidth, config.h/mapImg.naturalHeight);
-            ctx.drawImage(mapImg, (config.w-mapImg.naturalWidth*s)/2, (config.h-mapImg.naturalHeight*s)/2, mapImg.naturalWidth*s, mapImg.naturalHeight*s);
+function exportDXF() {
+    const fileName = `${projectName}_${getFormattedDate()}.dxf`;
+    let d = "  0\nSECTION\n  2\nHEADER\n  9\n$ACADVER\n  1\nAC1009\n  0\nENDSEC\n  0\nSECTION\n  2\nENTITIES\n";
+    allPaths.forEach(i => {
+        if (i.points && i.points.length > 1) {
+            d += `  0\nPOLYLINE\n  8\nSurvey\n 66\n 1\n`;
+            i.points.forEach(p => d += `  0\nVERTEX\n  8\nSurvey\n 10\n${p.x}\n 20\n${-p.y}\n`);
+            d += "  0\nSEQEND\n";
+        } else if (i.type) {
+            const r = 7.0;
+            d += `  0\nCIRCLE\n  8\nSurvey\n 10\n${i.x}\n 20\n${-i.y}\n 40\n${r}\n`;
+            if (i.type === 'stamp-double') d += `  0\nCIRCLE\n  8\nSurvey\n 10\n${i.x}\n 20\n${-i.y}\n 40\n${r*0.6}\n`;
         }
+    });
+    d += "  0\nENDSEC\n  0\nEOF";
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([d], {type: "application/dxf"}));
+    a.download = fileName;
+    a.click();
+}
 
-        // 保存済みデータ
-        allPaths.forEach(p => drawItem(ctx, p));
-        if (currentPath) drawItem(ctx, currentPath);
+function exportGeoJSON() {
+    const fileName = `${projectName}_${getFormattedDate()}.geojson`;
+    const features = allPaths.map(item => ({
+        type: "Feature",
+        geometry: {
+            type: item.points ? "LineString" : "Point",
+            coordinates: item.points ? item.points.map(p => [p.x, -p.y]) : [item.x, -item.y]
+        },
+        properties: { type: item.type, color: item.color }
+    }));
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify({type: "FeatureCollection", features: features})], {type: "application/json"}));
+    a.download = fileName;
+    a.click();
+}
 
-        // ゴースト (ペンモード以外で表示)
-        if (mode !== 'draw' && mode !== 'erase' && !isPanning) {
-            const pt = getPos({clientX: mousePos.x, clientY: mousePos.y});
-            ctx.globalAlpha = 0.5;
-            drawItem(ctx, {type: mode, x: pt.x, y: pt.y, color: currentColor});
-            ctx.globalAlpha = 1.0;
+window.addEventListener('beforeunload', (e) => {
+    if (allPaths.length > 0) {
+        e.preventDefault();
+        e.returnValue = ''; 
+    }
+});
+
+function resize() {
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = window.innerWidth * dpr;
+    canvas.height = window.innerHeight * dpr;
+    canvas.style.width = window.innerWidth + 'px';
+    canvas.style.height = window.innerHeight + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    render();
+}
+
+function toCanvas(sx, sy) {
+    return { x: (sx - view.x) / view.scale + A3_W / 2, y: (sy - view.y) / view.scale + A3_H / 2 };
+}
+
+function render() {
+    const dpr = window.devicePixelRatio || 1;
+    ctx.save();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = "#f1f5f9"; ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(view.x, view.y);
+    ctx.scale(view.scale, view.scale);
+    ctx.translate(-A3_W/2, -A3_H/2);
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, A3_W, A3_H);
+    
+    if (mapImage.complete && mapImage.naturalWidth > 0) {
+        const s = Math.min(A3_W/mapImage.naturalWidth, A3_H/mapImage.naturalHeight);
+        ctx.drawImage(mapImage, (A3_W-mapImage.naturalWidth*s)/2, (A3_H-mapImage.naturalHeight*s)/2, mapImage.naturalWidth*s, mapImage.naturalHeight*s);
+    }
+
+    const drawItem = (item, alpha = 1) => {
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = ctx.fillStyle = item.color;
+        ctx.lineWidth = 2;
+        if (item.type && item.type.startsWith('stamp')) {
+            const r = 7;
+            ctx.beginPath(); ctx.arc(item.x, item.y, r, 0, Math.PI*2);
+            item.type === 'stamp-dot' ? ctx.fill() : ctx.stroke();
+            if (item.type === 'stamp-double') {
+                ctx.beginPath(); ctx.arc(item.x, item.y, r*0.6, 0, Math.PI*2); ctx.stroke();
+            }
+        } else if (item.points) {
+            ctx.beginPath(); ctx.lineCap = ctx.lineJoin = "round";
+            ctx.moveTo(item.points[0].x, item.points[0].y);
+            item.points.forEach(p => ctx.lineTo(p.x, p.y)); ctx.stroke();
         }
         ctx.restore();
-        needsRender = false;
+    };
+    
+    allPaths.forEach(i => drawItem(i));
+    if (currentPath) drawItem(currentPath);
+
+    // スタンププレビュー描画
+    if (mode.startsWith('stamp') && currentMousePos && !isPanning) {
+        const pt = toCanvas(currentMousePos.x, currentMousePos.y);
+        drawItem({type: mode, x: pt.x, y: pt.y, color: currentColor}, 0.5);
     }
-    requestAnimationFrame(renderLoop);
+    
+    ctx.restore();
+
+    if (mode === 'window' && windowRect) {
+        ctx.strokeStyle = "rgba(37, 99, 235, 0.8)"; ctx.lineWidth = 2; ctx.setLineDash([5, 5]);
+        ctx.strokeRect(windowRect.x, windowRect.y, windowRect.w, windowRect.h); ctx.setLineDash([]);
+    }
 }
 
-function drawItem(tCtx, item) {
-    tCtx.beginPath();
-    tCtx.strokeStyle = tCtx.fillStyle = item.color || currentColor;
-    tCtx.lineWidth = 2;
-    tCtx.lineCap = "round";
-    if (item.points) {
-        tCtx.moveTo(item.points[0].x, item.points[0].y);
-        item.points.forEach(pt => tCtx.lineTo(pt.x, pt.y));
-        tCtx.stroke();
-    } else {
-        const r = 7;
-        tCtx.arc(item.x, item.y, r, 0, Math.PI*2);
-        item.type === 'stamp-dot' ? tCtx.fill() : tCtx.stroke();
-        if (item.type === 'stamp-double') {
-            tCtx.beginPath(); tCtx.arc(item.x, item.y, r*0.6, 0, Math.PI*2); tCtx.stroke();
+window.addEventListener('pointermove', e => {
+    currentMousePos = { x: e.clientX, y: e.clientY };
+    const idx = lastPointers.findIndex(p => p.pointerId === e.pointerId);
+    if (idx !== -1) {
+        const oldPointers = [...lastPointers];
+        lastPointers[idx] = e;
+        const pt = toCanvas(e.clientX, e.clientY);
+
+        if (isPanning) {
+            if (lastPointers.length >= 2) {
+                // ピンチ操作
+                const p1_o = oldPointers[0], p2_o = oldPointers[1];
+                const p1_n = lastPointers[0], p2_n = lastPointers[1];
+                const dist_o = Math.hypot(p1_o.clientX - p2_o.clientX, p1_o.clientY - p2_o.clientY);
+                const dist_n = Math.hypot(p1_n.clientX - p2_n.clientX, p1_n.clientY - p2_n.clientY);
+                if (dist_o > 0) {
+                    const ratio = dist_n / dist_o;
+                    const mx = (p1_n.clientX + p2_n.clientX) / 2;
+                    const my = (p1_n.clientY + p2_n.clientY) / 2;
+                    view.x = mx - (mx - view.x) * ratio;
+                    view.y = my - (my - view.y) * ratio;
+                    view.scale *= ratio;
+                }
+                view.x += ((p1_n.clientX - p1_o.clientX) + (p2_n.clientX - p2_o.clientX)) / 2;
+                view.y += ((p1_n.clientY - p1_o.clientY) + (p2_n.clientY - p2_o.clientY)) / 2;
+            } else {
+                // 1本指パン
+                view.x += e.clientX - oldPointers[idx].clientX;
+                view.y += e.clientY - oldPointers[idx].clientY;
+            }
+        } else if (mode === 'window' && windowStart) {
+            windowRect = { x: Math.min(windowStart.x, pt.x), y: Math.min(windowStart.y, pt.y), w: Math.abs(pt.x - windowStart.x), h: Math.abs(pt.y - windowStart.y) };
+        } else if (currentPath) {
+            currentPath.points.push(pt);
         }
-    }
-}
-
-// --- イベント制御 ---
-canvas.addEventListener('pointerdown', e => {
-    pointers.push(e);
-    const pt = getPos(e);
-    if (e.button === 2 || pointers.length > 1) {
-        isPanning = true; currentPath = null;
-    } else if (mode === 'draw') {
-        currentPath = { points: [pt], color: currentColor };
-    } else if (mode === 'erase') {
-        allPaths = allPaths.filter(p => {
-            const hit = p.points ? p.points.some(d => Math.hypot(d.x-pt.x, d.y-pt.y) < 15/view.scale) : Math.hypot(p.x-pt.x, p.y-pt.y) < 15/view.scale;
-            return !hit;
-        });
-        autoSave();
     }
     render();
 });
 
-window.addEventListener('pointermove', e => {
-    mousePos = {x: e.clientX, y: e.clientY};
-    const idx = pointers.findIndex(p => p.pointerId === e.pointerId);
-    if (idx === -1) { render(); return; }
-    const prev = pointers[idx];
-    const pt = getPos(e);
-    if (isPanning) {
-        view.x += e.clientX - prev.clientX;
-        view.y += e.clientY - prev.clientY;
-    } else if (currentPath) {
-        const last = currentPath.points[currentPath.points.length-1];
-        if (Math.hypot(last.x - pt.x, last.y - pt.y) > 2) currentPath.points.push(pt);
+canvas.addEventListener('pointerdown', e => {
+    lastPointers.push(e);
+    const pt = toCanvas(e.clientX, e.clientY);
+    if (e.button === 2 || lastPointers.length > 1) { isPanning = true; currentPath = null; return; }
+    if (mode === 'window') { windowStart = pt; return; }
+    if (pt.x < 0 || pt.x > A3_W || pt.y < 0 || pt.y > A3_H) return;
+    if (mode.startsWith('stamp')) { allPaths.push({type: mode, x: pt.x, y: pt.y, color: currentColor}); }
+    else if (mode === 'draw') currentPath = {points: [pt], color: currentColor};
+    else if (mode === 'erase') {
+        allPaths = allPaths.filter(i => {
+            const dist = i.points ? i.points.some(p => Math.hypot(p.x-pt.x, p.y-pt.y) < 20/view.scale) : Math.hypot(i.x-pt.x, i.y-pt.y) < 20/view.scale;
+            return !dist;
+        });
     }
-    pointers[idx] = e;
     render();
 });
 
 window.addEventListener('pointerup', e => {
-    if (pointers.length === 1 && !isPanning && mode.startsWith('stamp')) {
-        const pt = getPos(e);
-        allPaths.push({type: mode, x: pt.x, y: pt.y, color: currentColor});
-        autoSave();
+    lastPointers = lastPointers.filter(p => p.pointerId !== e.pointerId);
+    if (lastPointers.length === 0) { 
+        isPanning = false; windowStart = null; 
+        if (currentPath) { allPaths.push(currentPath); currentPath = null; } 
     }
-    if (currentPath) { allPaths.push(currentPath); currentPath = null; autoSave(); }
-    pointers = pointers.filter(p => p.pointerId !== e.pointerId);
-    if (pointers.length === 0) isPanning = false;
     render();
 });
 
 canvas.addEventListener('wheel', e => {
     e.preventDefault();
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    const pt = getPos(e);
-    view.scale *= delta;
-    view.x = e.clientX - pt.x * view.scale;
-    view.y = e.clientY - pt.y * view.scale;
-    render();
-}, {passive: false});
+    view.x = e.clientX - (e.clientX - view.x) * delta; view.y = e.clientY - (e.clientY - view.y) * delta;
+    view.scale *= delta; render();
+}, { passive: false });
 
-// --- ツール機能 ---
-function createColorPicker() {
-    const cp = document.getElementById('colorPicker');
-    ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#0f172a'].forEach(c => {
-        const b = document.createElement('div');
-        b.className = 'color-btn' + (c === currentColor ? ' selected' : '');
-        b.style.background = c;
-        b.onclick = () => { currentColor = c; createColorPicker(); render(); };
+function toggleToolbar() { document.getElementById('toolbar').classList.toggle('hidden'); }
+function setMode(m) { 
+    mode = m;
+    const btns = {draw:'btn-draw', erase:'btn-erase', 'stamp-circle':'btn-s1', 'stamp-dot':'btn-s2', 'stamp-double':'btn-s3', 'window':'btn-window'};
+    Object.values(btns).forEach(id => { if(document.getElementById(id)) document.getElementById(id).className = ''; });
+    if(btns[m]) document.getElementById(btns[m]).className = 'active';
+}
+
+function createColorButtons() {
+    const cp = document.getElementById('colorPicker'); cp.innerHTML = '';
+    ['#ef4444', '#3b82f6', '#a855f7', '#22c55e', '#f59e0b', '#0f172a'].forEach(c => {
+        const b = document.createElement('div'); b.className = 'color-btn' + (c === currentColor ? ' selected' : '');
+        b.style.background = c; b.onclick = () => { currentColor = c; createColorButtons(); };
         cp.appendChild(b);
     });
 }
 
-function setMode(m) {
-    mode = m;
-    document.querySelectorAll('#toolbar button').forEach(b => b.classList.remove('active'));
-    const id = {draw:'btn-draw', erase:'btn-erase', 'stamp-circle':'btn-s1', 'stamp-dot':'btn-s2', 'stamp-double':'btn-s3'}[m];
-    if(id) document.getElementById(id).classList.add('active');
-    render();
-}
-
-function undo() { allPaths.pop(); autoSave(); render(); }
 function resetView() {
-    const s = Math.min((window.innerWidth-100)/config.w, (window.innerHeight-100)/config.h);
-    view = { x: (window.innerWidth - config.w*s)/2, y: (window.innerHeight - config.h*s)/2, scale: s };
-    render();
-}
-function resize() {
-    canvas.width = window.innerWidth * (window.devicePixelRatio || 1);
-    canvas.height = window.innerHeight * (window.devicePixelRatio || 1);
-    render();
+    const s = Math.min((window.innerWidth-100)/A3_W, (window.innerHeight-100)/A3_H);
+    view = { x: window.innerWidth/2, y: window.innerHeight/2, scale: s }; render();
 }
 
-function autoSave() {
-    const data = { allPaths, config, projectName, mapData: mapImg.src.startsWith('data') ? mapImg.src : null };
-    localStorage.setItem('field_note_save', JSON.stringify(data));
-}
+function undo() { if(allPaths.length > 0) { allPaths.pop(); render(); } }
 
-async function exportZip() {
-    const zip = new JSZip();
-    zip.file("data.json", JSON.stringify({allPaths, config, projectName}));
-    const blob = await zip.generateAsync({type:"blob"});
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = projectName+".zip"; a.click();
-}
-
-document.getElementById('map-input').onchange = e => {
+function importProjectJSON(i) {
     const r = new FileReader();
-    r.onload = f => { mapImg = new Image(); mapImg.onload = () => { resetView(); autoSave(); }; mapImg.src = f.target.result; };
+    r.onload = e => {
+        try {
+            const d = JSON.parse(e.target.result); 
+            allPaths = d.paths || [];
+            projectName = d.projectName || "復元プロジェクト";
+            mapImage = new Image(); 
+            mapImage.onload = () => { resetView(); render(); }; 
+            mapImage.src = d.map || "";
+            document.getElementById('start-overlay').style.display = 'none';
+        } catch(err) { alert("ファイルの読み込みに失敗しました。"); }
+    };
+    if(i.files[0]) r.readAsText(i.files[0]);
+}
+
+document.getElementById('mapInput').onchange = e => {
+    const r = new FileReader();
+    r.onload = f => { mapImage = new Image(); mapImage.onload = resetView; mapImage.src = f.target.result; };
     if(e.target.files[0]) r.readAsDataURL(e.target.files[0]);
 };
 
-if(localStorage.getItem('field_note_save')) document.getElementById('resume-area').style.display = 'block';
+init();
 </script>
 </body>
 </html>
