@@ -17,7 +17,6 @@
             position: fixed; width: 100%; height: 100%; touch-action: none; 
         }
         
-        /* ツールバー */
         #toolbar { 
             position: fixed; top: 20px; left: 20px; z-index: 1000; 
             background: var(--bg-panel); backdrop-filter: blur(10px);
@@ -36,7 +35,6 @@
             display: flex; align-items: center; justify-content: center;
         }
 
-        /* 開始オーバーレイ */
         #start-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(8px);
@@ -48,12 +46,12 @@
         }
         .start-card h2 { margin-top: 0; color: var(--text); }
         .start-card input {
-            width: 100%; padding: 12px; margin: 20px 0; border: 2px solid var(--border);
+            width: 100%; padding: 12px; margin: 15px 0; border: 2px solid var(--border);
             border-radius: 8px; font-size: 16px; box-sizing: border-box;
         }
         .start-card button {
             width: 100%; padding: 12px; background: var(--accent); color: white;
-            border: none; border-radius: 8px; font-weight: bold; cursor: pointer;
+            border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-bottom: 10px;
         }
 
         .section { display: flex; flex-direction: column; gap: 6px; }
@@ -83,9 +81,13 @@
 <div id="start-overlay">
     <div class="start-card">
         <h2>調査開始</h2>
-        <p style="color: #64748b; font-size: 14px;">業務名を入力してください</p>
+        <p style="color: #64748b; font-size: 14px;">新規プロジェクト名を入力</p>
         <input type="text" id="project-name-input" placeholder="例: 〇〇地区 猛禽類調査">
-        <button onclick="startProject()">調査を開始する</button>
+        <button onclick="startProject()">新規開始</button>
+        <div style="margin: 15px 0; border-top: 1px solid #e2e8f0; padding-top: 15px;">
+            <p style="color: #64748b; font-size: 14px;">または既存ファイルから再開</p>
+            <button onclick="document.getElementById('importFile').click()" style="background: #64748b;">ファイルを選択</button>
+        </div>
     </div>
 </div>
 
@@ -151,7 +153,8 @@ let mapImage = new Image(), allPaths = [], currentPath = null;
 let mode = 'draw', currentColor = '#ef4444', view = { x: 0, y: 0, scale: 0.5 };
 let lastPointers = [], isPanning = false;
 let windowStart = null, windowRect = null;
-let projectName = ""; // 業務名保持用
+let projectName = ""; 
+let currentMousePos = null; // プレビュー用
 
 function init() {
     window.addEventListener('resize', resize);
@@ -163,7 +166,6 @@ function init() {
     render();
 }
 
-// 1. 開始処理
 function startProject() {
     const input = document.getElementById('project-name-input');
     if (!input.value.trim()) { alert("業務名を入力してください。"); return; }
@@ -171,16 +173,11 @@ function startProject() {
     document.getElementById('start-overlay').style.display = 'none';
 }
 
-// 日付取得 (YYYYMMDD)
 function getFormattedDate() {
     const now = new Date();
-    const y = now.getFullYear();
-    const m = String(now.getMonth() + 1).padStart(2, '0');
-    const d = String(now.getDate()).padStart(2, '0');
-    return `${y}${m}${d}`;
+    return `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
 }
 
-// 2. 保存機能 (JSON) - 自動命名 
 function exportProjectJSON() {
     const fileName = `${projectName}_${getFormattedDate()}.json`;
     const a = document.createElement('a');
@@ -189,11 +186,9 @@ function exportProjectJSON() {
     a.click();
 }
 
-// 3. DXF出力 (AutoCAD) - 自動命名 
 function exportDXF() {
     const fileName = `${projectName}_${getFormattedDate()}.dxf`;
     let d = "  0\nSECTION\n  2\nHEADER\n  9\n$ACADVER\n  1\nAC1009\n  0\nENDSEC\n  0\nSECTION\n  2\nENTITIES\n";
-    
     allPaths.forEach(i => {
         if (i.points && i.points.length > 1) {
             d += `  0\nPOLYLINE\n  8\nSurvey\n 66\n 1\n`;
@@ -212,7 +207,6 @@ function exportDXF() {
     a.click();
 }
 
-// QGIS用 GeoJSON出力 (図面座標系)
 function exportGeoJSON() {
     const fileName = `${projectName}_${getFormattedDate()}.geojson`;
     const features = allPaths.map(item => ({
@@ -229,7 +223,6 @@ function exportGeoJSON() {
     a.click();
 }
 
-// 4. 安心機能 (離脱防止)
 window.addEventListener('beforeunload', (e) => {
     if (allPaths.length > 0) {
         e.preventDefault();
@@ -237,7 +230,6 @@ window.addEventListener('beforeunload', (e) => {
     }
 });
 
-// --- 既存の描画エンジンの維持 --- [cite: 35-77, 100-116]
 function resize() {
     const dpr = window.devicePixelRatio || 1;
     canvas.width = window.innerWidth * dpr;
@@ -270,7 +262,9 @@ function render() {
         ctx.drawImage(mapImage, (A3_W-mapImage.naturalWidth*s)/2, (A3_H-mapImage.naturalHeight*s)/2, mapImage.naturalWidth*s, mapImage.naturalHeight*s);
     }
 
-    const drawItem = (item) => {
+    const drawItem = (item, alpha = 1) => {
+        ctx.save();
+        ctx.globalAlpha = alpha;
         ctx.strokeStyle = ctx.fillStyle = item.color;
         ctx.lineWidth = 2;
         if (item.type && item.type.startsWith('stamp')) {
@@ -285,9 +279,18 @@ function render() {
             ctx.moveTo(item.points[0].x, item.points[0].y);
             item.points.forEach(p => ctx.lineTo(p.x, p.y)); ctx.stroke();
         }
+        ctx.restore();
     };
-    allPaths.forEach(drawItem);
+    
+    allPaths.forEach(i => drawItem(i));
     if (currentPath) drawItem(currentPath);
+
+    // スタンププレビュー描画
+    if (mode.startsWith('stamp') && currentMousePos && !isPanning) {
+        const pt = toCanvas(currentMousePos.x, currentMousePos.y);
+        drawItem({type: mode, x: pt.x, y: pt.y, color: currentColor}, 0.5);
+    }
+    
     ctx.restore();
 
     if (mode === 'window' && windowRect) {
@@ -297,13 +300,35 @@ function render() {
 }
 
 window.addEventListener('pointermove', e => {
+    currentMousePos = { x: e.clientX, y: e.clientY };
     const idx = lastPointers.findIndex(p => p.pointerId === e.pointerId);
     if (idx !== -1) {
+        const oldPointers = [...lastPointers];
+        lastPointers[idx] = e;
         const pt = toCanvas(e.clientX, e.clientY);
+
         if (isPanning) {
-            const old = lastPointers[idx];
-            view.x += e.clientX - old.clientX; view.y += e.clientY - old.clientY;
-            lastPointers[idx] = e;
+            if (lastPointers.length >= 2) {
+                // ピンチ操作
+                const p1_o = oldPointers[0], p2_o = oldPointers[1];
+                const p1_n = lastPointers[0], p2_n = lastPointers[1];
+                const dist_o = Math.hypot(p1_o.clientX - p2_o.clientX, p1_o.clientY - p2_o.clientY);
+                const dist_n = Math.hypot(p1_n.clientX - p2_n.clientX, p1_n.clientY - p2_n.clientY);
+                if (dist_o > 0) {
+                    const ratio = dist_n / dist_o;
+                    const mx = (p1_n.clientX + p2_n.clientX) / 2;
+                    const my = (p1_n.clientY + p2_n.clientY) / 2;
+                    view.x = mx - (mx - view.x) * ratio;
+                    view.y = my - (my - view.y) * ratio;
+                    view.scale *= ratio;
+                }
+                view.x += ((p1_n.clientX - p1_o.clientX) + (p2_n.clientX - p2_o.clientX)) / 2;
+                view.y += ((p1_n.clientY - p1_o.clientY) + (p2_n.clientY - p2_o.clientY)) / 2;
+            } else {
+                // 1本指パン
+                view.x += e.clientX - oldPointers[idx].clientX;
+                view.y += e.clientY - oldPointers[idx].clientY;
+            }
         } else if (mode === 'window' && windowStart) {
             windowRect = { x: Math.min(windowStart.x, pt.x), y: Math.min(windowStart.y, pt.y), w: Math.abs(pt.x - windowStart.x), h: Math.abs(pt.y - windowStart.y) };
         } else if (currentPath) {
@@ -316,7 +341,7 @@ window.addEventListener('pointermove', e => {
 canvas.addEventListener('pointerdown', e => {
     lastPointers.push(e);
     const pt = toCanvas(e.clientX, e.clientY);
-    if (e.button === 2 || lastPointers.length > 1) { isPanning = true; return; }
+    if (e.button === 2 || lastPointers.length > 1) { isPanning = true; currentPath = null; return; }
     if (mode === 'window') { windowStart = pt; return; }
     if (pt.x < 0 || pt.x > A3_W || pt.y < 0 || pt.y > A3_H) return;
     if (mode.startsWith('stamp')) { allPaths.push({type: mode, x: pt.x, y: pt.y, color: currentColor}); }
@@ -368,14 +393,20 @@ function resetView() {
     view = { x: window.innerWidth/2, y: window.innerHeight/2, scale: s }; render();
 }
 
+function undo() { if(allPaths.length > 0) { allPaths.pop(); render(); } }
+
 function importProjectJSON(i) {
     const r = new FileReader();
     r.onload = e => {
-        const d = JSON.parse(e.target.result); 
-        allPaths = d.paths || [];
-        projectName = d.projectName || "";
-        mapImage = new Image(); mapImage.onload = () => { resetView(); render(); }; mapImage.src = d.map || "";
-        if (projectName) document.getElementById('start-overlay').style.display = 'none';
+        try {
+            const d = JSON.parse(e.target.result); 
+            allPaths = d.paths || [];
+            projectName = d.projectName || "復元プロジェクト";
+            mapImage = new Image(); 
+            mapImage.onload = () => { resetView(); render(); }; 
+            mapImage.src = d.map || "";
+            document.getElementById('start-overlay').style.display = 'none';
+        } catch(err) { alert("ファイルの読み込みに失敗しました。"); }
     };
     if(i.files[0]) r.readAsText(i.files[0]);
 }
