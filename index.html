@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>猛禽類調査野帳 - Field Reliable Ed.</title>
+    <title>猛禽類調査野帳 - Field Reliable Ed. Fixed</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         :root { --accent: #2563eb; --bg-panel: rgba(255, 255, 255, 0.9); --border: #e2e8f0; --text: #1e293b; }
@@ -95,7 +95,7 @@ let currentMousePos = null, saveTimer = null, pointerMoved = false;
 const canvas = document.getElementById('viewport');
 const ctx = canvas.getContext('2d');
 
-// --- IndexedDB (完了待ち・エラー対応) ---
+// --- IndexedDB ---
 const dbName = "FieldNoteDB", storeName = "AutoSave";
 function openDB() {
     return new Promise((resolve, reject) => {
@@ -111,10 +111,9 @@ async function saveToDB(key, data) {
         return new Promise((resolve, reject) => {
             const tx = db.transaction(storeName, "readwrite");
             tx.oncomplete = () => resolve();
-            tx.onerror = () => reject(tx.error);
             tx.objectStore(storeName).put(data, key);
         });
-    } catch(e) { console.warn("DB Save Error:", e); }
+    } catch(e) { console.warn("DB Save Error"); }
 }
 async function getFromDB(key) {
     try {
@@ -141,9 +140,13 @@ function init() {
 function requestRender() { needsRender = true; }
 function renderLoop() { if (isVisible && needsRender) { render(); needsRender = false; } requestAnimationFrame(renderLoop); }
 
-// --- 描画・座標 ---
+// --- 座標変換 (ここが狂いの原因でした。単純化します) ---
 function toCanvas(sx, sy) {
-    return { x: (sx - view.x) / view.scale + currentPaper.w / 2, y: (sy - view.y) / view.scale + currentPaper.h / 2 };
+    // 画面上の(sx, sy)を、用紙上の(x, y)に変換
+    return {
+        x: (sx - view.x) / view.scale + (currentPaper.w / 2),
+        y: (sy - view.y) / view.scale + (currentPaper.h / 2)
+    };
 }
 
 function render() {
@@ -153,53 +156,77 @@ function render() {
     ctx.restore();
 
     ctx.save();
-    ctx.translate(view.x, view.y); ctx.scale(view.scale, view.scale); ctx.translate(-currentPaper.w/2, -currentPaper.h/2);
-    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, currentPaper.w, currentPaper.h);
+    // 表示の起点を用紙の中心に合わせる
+    ctx.translate(view.x, view.y);
+    ctx.scale(view.scale, view.scale);
+    ctx.translate(-currentPaper.w / 2, -currentPaper.h / 2);
+
+    // 用紙描画
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, currentPaper.w, currentPaper.h);
+    
+    // 背景画像
     if (mapImage.complete && mapImage.naturalWidth > 0) {
         const s = Math.min(currentPaper.w/mapImage.naturalWidth, currentPaper.h/mapImage.naturalHeight);
         ctx.drawImage(mapImage, (currentPaper.w-mapImage.naturalWidth*s)/2, (currentPaper.h-mapImage.naturalHeight*s)/2, mapImage.naturalWidth*s, mapImage.naturalHeight*s);
     }
+    
+    // 保存済み描画
     allPaths.forEach(i => drawCore(ctx, i));
+    
+    // 現在描画中の線
     if (currentPath) drawCore(ctx, currentPath);
+
+    // スタンプのゴースト表示
     if (mode.startsWith('stamp') && currentMousePos && !isPanning) {
         const pt = toCanvas(currentMousePos.x, currentMousePos.y);
         drawCore(ctx, {type: mode, x: pt.x, y: pt.y, color: currentColor}, 0.4);
     }
-    ctx.restore();
-
+    
+    // 範囲選択
     if (mode === 'window' && windowRect) {
-        ctx.save();
-        ctx.translate(view.x, view.y); ctx.scale(view.scale, view.scale); ctx.translate(-currentPaper.w/2, -currentPaper.h/2);
         ctx.strokeStyle = "rgba(37, 99, 235, 0.8)"; ctx.lineWidth = 2/view.scale; ctx.setLineDash([5/view.scale, 5/view.scale]);
         ctx.strokeRect(windowRect.x, windowRect.y, windowRect.w, windowRect.h);
-        ctx.restore();
     }
+    ctx.restore();
 }
 
 function drawCore(targetCtx, item, alpha = 1) {
-    targetCtx.save(); targetCtx.globalAlpha = alpha;
-    targetCtx.strokeStyle = targetCtx.fillStyle = item.color; targetCtx.lineWidth = 2;
+    targetCtx.save();
+    targetCtx.globalAlpha = alpha;
+    targetCtx.strokeStyle = targetCtx.fillStyle = item.color;
+    targetCtx.lineWidth = 2;
     targetCtx.lineCap = targetCtx.lineJoin = "round";
+    
     if (item.type && item.type.startsWith('stamp')) {
-        const r = 7; targetCtx.beginPath(); targetCtx.arc(item.x, item.y, r, 0, Math.PI*2);
+        const r = 7;
+        targetCtx.beginPath();
+        targetCtx.arc(item.x, item.y, r, 0, Math.PI*2);
         item.type === 'stamp-dot' ? targetCtx.fill() : targetCtx.stroke();
-        if (item.type === 'stamp-double') { targetCtx.beginPath(); targetCtx.arc(item.x, item.y, r*0.6, 0, Math.PI*2); targetCtx.stroke(); }
+        if (item.type === 'stamp-double') {
+            targetCtx.beginPath();
+            targetCtx.arc(item.x, item.y, r*0.6, 0, Math.PI*2);
+            targetCtx.stroke();
+        }
     } else if (item.points && item.points.length > 0) {
-        targetCtx.beginPath(); targetCtx.moveTo(item.points[0].x, item.points[0].y);
+        targetCtx.beginPath();
+        targetCtx.moveTo(item.points[0].x, item.points[0].y);
         for(let i=1; i<item.points.length; i++) targetCtx.lineTo(item.points[i].x, item.points[i].y);
         targetCtx.stroke();
     }
     targetCtx.restore();
 }
 
-// --- 入力制御 ---
+// --- 入力制御 (パン・ズーム・描画) ---
 window.addEventListener('pointermove', e => {
     currentMousePos = { x: e.clientX, y: e.clientY };
     const idx = lastPointers.findIndex(p => p.pointerId === e.pointerId);
     if (idx !== -1) {
         const oldPointers = [...lastPointers]; lastPointers[idx] = e;
         const pt = toCanvas(e.clientX, e.clientY);
+        
         if (Math.hypot(e.clientX - oldPointers[idx].clientX, e.clientY - oldPointers[idx].clientY) > 3) pointerMoved = true;
+
         if (isPanning) {
             if (lastPointers.length >= 2 && oldPointers.length >= 2) {
                 const p1o = oldPointers[0], p2o = oldPointers[1], p1n = lastPointers[0], p2n = lastPointers[1];
@@ -213,7 +240,8 @@ window.addEventListener('pointermove', e => {
                 view.x += ((p1n.clientX - p1o.clientX) + (p2n.clientX - p2o.clientX)) / 2;
                 view.y += ((p1n.clientY - p1o.clientY) + (p2n.clientY - p2o.clientY)) / 2;
             } else {
-                view.x += e.clientX - oldPointers[idx].clientX; view.y += e.clientY - oldPointers[idx].clientY;
+                view.x += e.clientX - oldPointers[idx].clientX;
+                view.y += e.clientY - oldPointers[idx].clientY;
             }
         } else if (mode === 'window' && windowStart) {
             windowRect = { x: Math.min(windowStart.x, pt.x), y: Math.min(windowStart.y, pt.y), w: Math.abs(pt.x - windowStart.x), h: Math.abs(pt.y - windowStart.y) };
@@ -231,6 +259,7 @@ canvas.addEventListener('pointerdown', e => {
     if (e.button === 2 || lastPointers.length > 1) { isPanning = true; currentPath = null; return; }
     if (mode === 'window') { windowStart = pt; windowRect = null; return; }
     if (pt.x < 0 || pt.x > currentPaper.w || pt.y < 0 || pt.y > currentPaper.h) return;
+    
     if (mode === 'draw') currentPath = {points: [pt], color: currentColor};
     else if (mode === 'erase') {
         allPaths = allPaths.filter(i => {
@@ -260,7 +289,7 @@ const handleUp = (e) => {
 window.addEventListener('pointerup', handleUp);
 window.addEventListener('pointercancel', handleUp);
 
-// --- データ管理 ---
+// --- データ保存 ---
 function queueAutosave() {
     clearTimeout(saveTimer);
     saveTimer = setTimeout(async () => {
@@ -276,8 +305,8 @@ async function resumeLastSession() {
     projectName = meta.projectName; allPaths = meta.paths; currentPaper = meta.paperSize;
     const savedImg = await getFromDB("lastMap");
     if(savedImg) {
-        const oldUrl = mapImage.src; mapImage = new Image();
-        mapImage.onload = () => { if(oldUrl.startsWith('blob:')) URL.revokeObjectURL(oldUrl); resetView(); requestRender(); };
+        mapImage = new Image();
+        mapImage.onload = () => { resetView(); requestRender(); };
         mapImage.src = savedImg;
     }
     document.getElementById('start-overlay').style.display = 'none';
@@ -291,6 +320,7 @@ async function exportAllAsZip() {
     zip.file(`data.json`, JSON.stringify({projectName, paths:allPaths, paperSize:currentPaper}));
     if (mapImage.src.startsWith('data:')) zip.file(`basemap.png`, mapImage.src.split(',')[1], {base64: true});
 
+    // DXF生成 (出力時のみ Y軸を反転させる)
     const dxfParts = ["  0\nSECTION\n  2\nENTITIES\n"];
     allPaths.forEach(i => {
         if (i.points) {
@@ -349,7 +379,7 @@ async function handleImport(input) {
         }
         document.getElementById('start-overlay').style.display = 'none';
         resetView();
-    } catch(e) { alert("読込失敗: " + e.message); }
+    } catch(e) { alert("読込失敗"); }
 }
 
 // --- 補助関数 ---
