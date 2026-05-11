@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>猛禽類調査野帳 - Reliable Final</title>
+    <title>猛禽類調査野帳 - Final Stable</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         :root { --accent: #2563eb; --bg-panel: rgba(255, 255, 255, 0.9); --border: #e2e8f0; --text: #1e293b; }
@@ -17,7 +17,7 @@
         .start-card button { width: 100%; padding: 12px; background: var(--accent); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-bottom: 8px; }
         .btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
         button { padding: 10px 8px; cursor: pointer; border: 1px solid var(--border); background: #fff; border-radius: 8px; font-size: 12px; }
-        button.active { background: var(--accent); color: white; }
+        button.active { background: var(--accent); color: white; border-color: var(--accent); }
         #colorPicker { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
         .color-btn { width: 26px; height: 26px; border-radius: 8px; cursor: pointer; border: 2px solid transparent; }
         .color-btn.selected { border-color: #fff; box-shadow: 0 0 0 2px var(--accent); }
@@ -30,15 +30,15 @@
 <div id="start-overlay">
     <div class="start-card">
         <h2>調査野帳 開始</h2>
-        <input type="text" id="project-name-input" placeholder="調査名">
+        <input type="text" id="project-name-input" placeholder="調査名（例: 飛翔調査01）">
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:15px;">
             <select id="paper-size"><option value="A3">A3</option><option value="A4">A4</option></select>
             <select id="paper-orient"><option value="LANDSCAPE">横向き</option><option value="PORTRAIT">縦向き</option></select>
         </div>
         <button onclick="startProject()">新規開始</button>
-        <button onclick="document.getElementById('importFile').click()" style="background: #64748b;">読込 (.zip)</button>
+        <button onclick="document.getElementById('importFile').click()" style="background: #64748b;">一括読込 (.zip)</button>
         <div id="resume-area" style="display:none; margin-top:10px; border-top:1px solid #eee; padding-top:10px;">
-            <button onclick="resumeLastSession()" style="background:#10b981;">続きから再開</button>
+            <button onclick="resumeLastSession()" style="background:#10b981;">直前の続きから再開</button>
         </div>
     </div>
 </div>
@@ -57,9 +57,9 @@
     </div>
     <div class="section">
         <div class="section-title">Basemap</div>
-        <button onclick="document.getElementById('mapInput').click()" style="width:100%;">🗺️ 地図を登録</button>
+        <button onclick="document.getElementById('mapInput').click()" style="width:100%;">🗺️ 地図画像を登録</button>
         <input type="file" id="mapInput" accept="image/*" style="display:none">
-        <button onclick="resetView()" style="width:100%; margin-top:4px;">リセット</button>
+        <button onclick="resetView()" style="width:100%; margin-top:4px;">表示位置リセット</button>
     </div>
     <div class="section">
         <div class="section-title">Tools</div>
@@ -83,7 +83,7 @@
 <canvas id="viewport"></canvas>
 
 <script>
-// --- ステート ---
+// --- ステート設定 ---
 const PAPER_CONFIG = { A3: { w: 1587, h: 1123 }, A4: { w: 1123, h: 794 } };
 let currentPaper = { w: 1587, h: 1123 };
 let mapImage = new Image(), allPaths = [], currentPath = null;
@@ -95,67 +95,84 @@ let currentMousePos = null, saveTimer = null, pointerMoved = false;
 const canvas = document.getElementById('viewport');
 const ctx = canvas.getContext('2d');
 
+// --- 描画ループ管理 ---
+function requestRender() { needsRender = true; }
+function renderLoop() { if (isVisible && needsRender) { render(); needsRender = false; } requestAnimationFrame(renderLoop); }
+
+// --- 初期化 ---
+function init() {
+    resize();
+    createColorButtons();
+    window.addEventListener('resize', () => { resize(); requestRender(); });
+    document.addEventListener('visibilitychange', () => { isVisible = !document.hidden; });
+    if(localStorage.getItem('field_note_meta')) document.getElementById('resume-area').style.display = 'block';
+    requestAnimationFrame(renderLoop);
+}
+
 // --- IndexedDB ---
 const dbName = "FieldNoteDB", storeName = "AutoSave";
-function openDB() {
-    return new Promise((resolve) => {
+async function openDB() {
+    return new Promise((resolve, reject) => {
         let request = indexedDB.open(dbName, 1);
         request.onupgradeneeded = e => e.target.result.createObjectStore(storeName);
         request.onsuccess = e => resolve(e.target.result);
+        request.onerror = e => reject(e.target.error);
     });
 }
 async function saveToDB(key, data) {
-    const db = await openDB();
-    const tx = db.transaction(storeName, "readwrite");
-    tx.objectStore(storeName).put(data, key);
+    try {
+        const db = await openDB();
+        const tx = db.transaction(storeName, "readwrite");
+        tx.objectStore(storeName).put(data, key);
+    } catch(e) { console.warn("Save failed", e); }
 }
 async function getFromDB(key) {
-    const db = await openDB();
-    return new Promise(resolve => {
-        let req = db.transaction(storeName).objectStore(storeName).get(key);
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => resolve(null);
-    });
+    try {
+        const db = await openDB();
+        return new Promise(resolve => {
+            let req = db.transaction(storeName).objectStore(storeName).get(key);
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => resolve(null);
+        });
+    } catch(e) { return null; }
 }
 
-// --- 座標変換 (極めてシンプルに固定) ---
+// --- 座標変換 ---
 function toCanvas(sx, sy) {
-    return {
-        x: (sx - view.x) / view.scale,
-        y: (sy - view.y) / view.scale
-    };
+    return { x: (sx - view.x) / view.scale, y: (sy - view.y) / view.scale };
 }
 
 function render() {
     const dpr = window.devicePixelRatio || 1;
     ctx.save();
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = "#f1f5f9";
-    ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+    ctx.fillStyle = "#f1f5f9"; ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
 
     ctx.translate(view.x, view.y);
     ctx.scale(view.scale, view.scale);
 
-    // 用紙描画
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(0, 0, currentPaper.w, currentPaper.h);
+    // 用紙本体
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, currentPaper.w, currentPaper.h);
     
-    // 背景画像
+    // 背景画像 (アスペクト維持して中央配置)
     if (mapImage.complete && mapImage.naturalWidth > 0) {
         const s = Math.min(currentPaper.w/mapImage.naturalWidth, currentPaper.h/mapImage.naturalHeight);
         ctx.drawImage(mapImage, (currentPaper.w-mapImage.naturalWidth*s)/2, (currentPaper.h-mapImage.naturalHeight*s)/2, mapImage.naturalWidth*s, mapImage.naturalHeight*s);
     }
     
-    // パス描画
+    // 描画済みパス
     allPaths.forEach(i => drawCore(ctx, i));
+    
+    // 描画中パス
     if (currentPath) drawCore(ctx, currentPath);
 
-    // ゴースト（プレビュー）
+    // スタンププレビュー（ゴースト）
     if (mode.startsWith('stamp') && currentMousePos && !isPanning) {
         const pt = toCanvas(currentMousePos.x, currentMousePos.y);
         drawCore(ctx, {type: mode, x: pt.x, y: pt.y, color: currentColor}, 0.5);
     }
     
+    // 範囲選択枠
     if (mode === 'window' && windowRect) {
         ctx.strokeStyle = "rgba(37, 99, 235, 0.8)"; ctx.lineWidth = 2/view.scale; ctx.setLineDash([5/view.scale, 5/view.scale]);
         ctx.strokeRect(windowRect.x, windowRect.y, windowRect.w, windowRect.h);
@@ -172,8 +189,7 @@ function drawCore(targetCtx, item, alpha = 1) {
     
     if (item.type && item.type.startsWith('stamp')) {
         const r = 7;
-        targetCtx.beginPath();
-        targetCtx.arc(item.x, item.y, r, 0, Math.PI*2);
+        targetCtx.beginPath(); targetCtx.arc(item.x, item.y, r, 0, Math.PI*2);
         item.type === 'stamp-dot' ? targetCtx.fill() : targetCtx.stroke();
         if (item.type === 'stamp-double') {
             targetCtx.beginPath(); targetCtx.arc(item.x, item.y, r*0.6, 0, Math.PI*2); targetCtx.stroke();
@@ -187,7 +203,7 @@ function drawCore(targetCtx, item, alpha = 1) {
     targetCtx.restore();
 }
 
-// --- イベント ---
+// --- 入力制御 ---
 window.addEventListener('pointermove', e => {
     currentMousePos = { x: e.clientX, y: e.clientY };
     const idx = lastPointers.findIndex(p => p.pointerId === e.pointerId);
@@ -197,7 +213,7 @@ window.addEventListener('pointermove', e => {
         if (Math.hypot(e.clientX - oldPointers[idx].clientX, e.clientY - oldPointers[idx].clientY) > 2) pointerMoved = true;
 
         if (isPanning) {
-            if (lastPointers.length >= 2 && oldPointers.length >= 2) {
+            if (lastPointers.length >= 2) {
                 const p1o = oldPointers[0], p2o = oldPointers[1], p1n = lastPointers[0], p2n = lastPointers[1];
                 const do_ = Math.hypot(p1o.clientX - p2o.clientX, p1o.clientY - p2o.clientY);
                 const dn = Math.hypot(p1n.clientX - p2n.clientX, p1n.clientY - p2n.clientY);
@@ -214,7 +230,11 @@ window.addEventListener('pointermove', e => {
         } else if (mode === 'window' && windowStart) {
             windowRect = { x: Math.min(windowStart.x, pt.x), y: Math.min(windowStart.y, pt.y), w: Math.abs(pt.x - windowStart.x), h: Math.abs(pt.y - windowStart.y) };
         } else if (currentPath) {
-            currentPath.points.push(pt);
+            // ポイントの間引き処理 (1.5px以上動いた場合のみ記録)
+            const last = currentPath.points[currentPath.points.length - 1];
+            if (!last || Math.hypot(last.x - pt.x, last.y - pt.y) > 1.5) {
+                currentPath.points.push(pt);
+            }
         }
         requestRender();
     }
@@ -269,8 +289,12 @@ async function resumeLastSession() {
     const meta = JSON.parse(localStorage.getItem('field_note_meta'));
     if(!meta) return;
     projectName = meta.projectName; allPaths = meta.paths; currentPaper = meta.paperSize;
-    const img = await getFromDB("lastMap");
-    if(img) { mapImage = new Image(); mapImage.onload = () => { resetView(); requestRender(); }; mapImage.src = img; }
+    const imgData = await getFromDB("lastMap");
+    if(imgData) {
+        const oldUrl = mapImage.src; mapImage = new Image();
+        mapImage.onload = () => { if(oldUrl.startsWith('blob:')) URL.revokeObjectURL(oldUrl); resetView(); requestRender(); };
+        mapImage.src = imgData;
+    }
     document.getElementById('start-overlay').style.display = 'none';
     resetView();
 }
@@ -282,7 +306,7 @@ async function exportAllAsZip() {
     zip.file(`data.json`, JSON.stringify({projectName, paths:allPaths, paperSize:currentPaper}));
     if (mapImage.src.startsWith('data:')) zip.file(`basemap.png`, mapImage.src.split(',')[1], {base64: true});
 
-    // DXF (CAD互換のため中心補正せず用紙座標のまま出力)
+    // DXF (Y軸反転のみ)
     const dxf = ["  0\nSECTION\n  2\nENTITIES\n"];
     allPaths.forEach(i => {
         if (i.points) {
@@ -304,34 +328,47 @@ async function exportAllAsZip() {
 
 async function handleImport(input) {
     const file = input.files[0]; if (!file) return;
-    const zip = await JSZip.loadAsync(file);
-    const d = JSON.parse(await zip.file("data.json").async("string"));
-    projectName = d.projectName; allPaths = d.paths; currentPaper = d.paperSize;
-    const imgFile = zip.file("basemap.png");
-    if (imgFile) {
-        const imgBlob = await imgFile.async("blob");
-        mapImage = new Image(); mapImage.onload = () => { resetView(); requestRender(); };
-        mapImage.src = URL.createObjectURL(imgBlob);
-    }
-    document.getElementById('start-overlay').style.display = 'none';
-    resetView();
+    try {
+        const zip = await JSZip.loadAsync(file);
+        const d = JSON.parse(await zip.file("data.json").async("string"));
+        projectName = d.projectName; allPaths = d.paths; currentPaper = d.paperSize;
+        const imgFile = zip.file("basemap.png");
+        if (imgFile) {
+            const oldUrl = mapImage.src; const imgBlob = await imgFile.async("blob");
+            mapImage = new Image();
+            mapImage.onload = () => { if(oldUrl.startsWith('blob:')) URL.revokeObjectURL(oldUrl); resetView(); requestRender(); };
+            mapImage.src = URL.createObjectURL(imgBlob);
+        }
+        document.getElementById('start-overlay').style.display = 'none';
+        resetView();
+    } catch(e) { alert("読込失敗"); }
 }
 
 function startProject() {
-    projectName = document.getElementById('project-name-input').value || "survey";
+    projectName = document.getElementById('project-name-input').value.trim() || "survey";
     const size = document.getElementById('paper-size').value, orient = document.getElementById('paper-orient').value;
     const base = PAPER_CONFIG[size]; currentPaper = (orient === 'PORTRAIT') ? { w: base.h, h: base.w } : { w: base.w, h: base.h };
     document.getElementById('start-overlay').style.display = 'none';
     resetView();
 }
+
+function undo() { if(allPaths.length > 0) { allPaths.pop(); queueAutosave(); requestRender(); } }
+
+function setMode(m) {
+    mode = m;
+    document.querySelectorAll('#toolbar button').forEach(b => b.classList.remove('active'));
+    // ボタンIDへのマッピング
+    const map = { draw:'btn-draw', erase:'btn-erase', window:'btn-window', 'stamp-circle':'btn-s1', 'stamp-dot':'btn-s2', 'stamp-double':'btn-s3' };
+    if(map[m]) document.getElementById(map[m]).classList.add('active');
+    requestRender();
+}
+
 function resize() {
     const dpr = window.devicePixelRatio || 1;
     canvas.width = window.innerWidth * dpr; canvas.height = window.innerHeight * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 function resetView() { view = { x: 50, y: 50, scale: Math.min((window.innerWidth-100)/currentPaper.w, (window.innerHeight-100)/currentPaper.h) }; requestRender(); }
-function undo() { allPaths.pop(); queueAutosave(); requestRender(); }
-function setMode(m) { mode = m; document.querySelectorAll('#toolbar button').forEach(b => b.classList.remove('active')); if(document.getElementById('btn-'+m.split('-')[0])) document.getElementById('btn-'+m.split('-')[0]).classList.add('active'); requestRender(); }
 function toggleToolbar() { document.getElementById('toolbar').classList.toggle('hidden'); }
 function createColorButtons() {
     const cp = document.getElementById('colorPicker'); cp.innerHTML = '';
@@ -342,12 +379,16 @@ function createColorButtons() {
     });
 }
 document.getElementById('mapInput').onchange = e => {
-    const r = new FileReader(); r.onload = f => { mapImage = new Image(); mapImage.onload = () => { resetView(); requestRender(); queueAutosave(); }; mapImage.src = f.target.result; };
+    const r = new FileReader(); r.onload = f => { 
+        const oldUrl = mapImage.src; mapImage = new Image(); 
+        mapImage.onload = () => { if(oldUrl.startsWith('blob:')) URL.revokeObjectURL(oldUrl); resetView(); requestRender(); queueAutosave(); };
+        mapImage.src = f.target.result; 
+    };
     if(e.target.files[0]) r.readAsDataURL(e.target.files[0]);
 };
 canvas.addEventListener('wheel', e => { e.preventDefault(); const delta = e.deltaY > 0 ? 0.9 : 1.1; view.x = e.clientX - (e.clientX - view.x) * delta; view.y = e.clientY - (e.clientY - view.y) * delta; view.scale *= delta; requestRender(); }, { passive: false });
 
-function renderLoop() { if (isVisible && needsRender) { render(); needsRender = false; } requestAnimationFrame(renderLoop); }
+// 起動
 init();
 </script>
 </body>
