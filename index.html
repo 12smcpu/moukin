@@ -3,17 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>猛禽類調査野帳 - Professional Multi-Size</title>
+    <title>猛禽類調査野帳 - Professional</title>
     <style>
-        /* 前回のスタイルを継承 */
         :root { --accent: #2563eb; --bg-panel: rgba(255, 255, 255, 0.9); --border: #e2e8f0; --text: #1e293b; }
         body { margin: 0; overflow: hidden; background: #f1f5f9; font-family: sans-serif; position: fixed; width: 100%; height: 100%; touch-action: none; }
         #toolbar { position: fixed; top: 20px; left: 20px; z-index: 1000; background: var(--bg-panel); backdrop-filter: blur(10px); padding: 16px; border-radius: 16px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 220px; max-height: 85vh; overflow-y: auto; border: 1px solid var(--border); transition: transform 0.3s; }
         #toolbar.hidden { transform: translateX(-280px); }
         #toggle-btn { position: fixed; top: 20px; left: 20px; z-index: 1001; width: 44px; height: 44px; background: var(--accent); color: white; border: none; border-radius: 12px; cursor: pointer; font-size: 20px; display: flex; align-items: center; justify-content: center; }
         #start-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(8px); z-index: 9999; display: flex; align-items: center; justify-content: center; }
-        .start-card { background: white; padding: 32px; border-radius: 20px; width: 90%; max-width: 420px; text-align: center; }
-        .start-card h2 { margin-top: 0; color: var(--text); }
+        .start-card { background: white; padding: 32px; border-radius: 20px; width: 90%; max-width: 400px; text-align: center; }
         .start-card input, .start-card select { width: 100%; padding: 12px; margin: 8px 0; border: 2px solid var(--border); border-radius: 8px; font-size: 16px; box-sizing: border-box; }
         .start-card .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
         .start-card button { width: 100%; padding: 12px; background: var(--accent); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-bottom: 8px; }
@@ -98,13 +96,12 @@
 <canvas id="viewport"></canvas>
 
 <script>
-// サイズ定数
 const PAPER_CONFIG = {
-    A3: { w: 1587, h: 1123 }, // 96dpi換算
+    A3: { w: 1587, h: 1123 },
     A4: { w: 1123, h: 794 }
 };
 
-let currentPaper = { w: 1587, h: 1123 }; // 初期値
+let currentPaper = { w: 1587, h: 1123 };
 let mapImage = new Image(), allPaths = [], currentPath = null;
 let mode = 'draw', currentColor = '#ef4444', view = { x: 0, y: 0, scale: 0.5 };
 let lastPointers = [], isPanning = false, needsRender = true, isVisible = true;
@@ -121,100 +118,76 @@ function init() {
     view.x = window.innerWidth / 2;
     view.y = window.innerHeight / 2;
     createColorButtons();
-    canvas.addEventListener('contextmenu', e => e.preventDefault());
     if(localStorage.getItem('field_note_autosave')) document.getElementById('resume-area').style.display = 'block';
     requestAnimationFrame(renderLoop);
 }
 
 function requestRender() { needsRender = true; }
+function renderLoop() { if (isVisible && needsRender) { render(); needsRender = false; } requestAnimationFrame(renderLoop); }
 
-function renderLoop() {
-    if (isVisible && needsRender) { render(); needsRender = false; }
-    requestAnimationFrame(renderLoop);
-}
-
-// 用紙設定の適用
 function applyPaperSize(sizeKey, orient) {
     const base = PAPER_CONFIG[sizeKey] || PAPER_CONFIG.A3;
-    if (orient === 'PORTRAIT') {
-        currentPaper = { w: base.h, h: base.w };
-    } else {
-        currentPaper = { w: base.w, h: base.h };
-    }
+    currentPaper = (orient === 'PORTRAIT') ? { w: base.h, h: base.w } : { w: base.w, h: base.h };
 }
 
 function startProject() {
-    projectName = document.getElementById('project-name-input').value.trim();
-    if (!projectName) return alert("業務名を入力してください");
-    
+    const nameVal = document.getElementById('project-name-input').value.trim();
+    if (!nameVal) return alert("業務名を入力してください");
+    projectName = nameVal;
+
     const sizeKey = document.getElementById('paper-size').value;
     const orient = document.getElementById('paper-orient').value;
     applyPaperSize(sizeKey, orient);
     
     document.getElementById('start-overlay').style.display = 'none';
     resetView();
+    requestRender();
+    queueAutosave();
 }
 
 function resumeLastSession() {
     try {
-        const data = JSON.parse(localStorage.getItem('field_note_autosave'));
-        allPaths = data.paths || [];
-        projectName = data.projectName || "復元データ";
-        // 保存データからサイズを復元（データにない場合はA3横）
-        if (data.paperSize) {
-            currentPaper = data.paperSize;
-        } else {
-            applyPaperSize('A3', 'LANDSCAPE');
-        }
-        mapImage = new Image();
+        const d = JSON.parse(localStorage.getItem('field_note_autosave'));
+        allPaths = d.paths || []; projectName = d.projectName || "復元";
+        currentPaper = d.paperSize || PAPER_CONFIG.A3;
+        mapImage = new Image(); 
         mapImage.onload = () => { resetView(); requestRender(); };
-        mapImage.src = data.map || "";
+        mapImage.src = d.map || "";
         document.getElementById('start-overlay').style.display = 'none';
-    } catch(e) { alert("復元に失敗しました"); }
+    } catch(e) { alert("復元失敗"); }
 }
 
 function queueAutosave() {
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
         try {
-            const data = { projectName, paths: allPaths, map: mapImage.src, paperSize: currentPaper };
-            localStorage.setItem('field_note_autosave', JSON.stringify(data));
-        } catch(e) { console.warn("Autosave failed: Storage full"); }
-    }, 1500); 
+            const d = { projectName, paths: allPaths, map: mapImage.src, paperSize: currentPaper };
+            localStorage.setItem('field_note_autosave', JSON.stringify(d));
+        } catch(e) {}
+    }, 1500);
 }
 
 function resize() {
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = window.innerWidth * dpr;
-    canvas.height = window.innerHeight * dpr;
-    canvas.style.width = window.innerWidth + 'px';
-    canvas.style.height = window.innerHeight + 'px';
+    canvas.width = window.innerWidth * dpr; canvas.height = window.innerHeight * dpr;
+    canvas.style.width = window.innerWidth + 'px'; canvas.style.height = window.innerHeight + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 
 function toCanvas(sx, sy) {
-    return { 
-        x: (sx - view.x) / view.scale + currentPaper.w / 2, 
-        y: (sy - view.y) / view.scale + currentPaper.h / 2 
-    };
+    return { x: (sx - view.x) / view.scale + currentPaper.w / 2, y: (sy - view.y) / view.scale + currentPaper.h / 2 };
 }
 
 function drawCore(targetCtx, item, alpha = 1) {
-    targetCtx.save();
-    targetCtx.globalAlpha = alpha;
-    targetCtx.strokeStyle = targetCtx.fillStyle = item.color;
-    targetCtx.lineWidth = 2;
+    targetCtx.save(); targetCtx.globalAlpha = alpha;
+    targetCtx.strokeStyle = targetCtx.fillStyle = item.color; targetCtx.lineWidth = 2;
     targetCtx.lineCap = targetCtx.lineJoin = "round";
     if (item.type && item.type.startsWith('stamp')) {
-        const r = 7;
-        targetCtx.beginPath(); targetCtx.arc(item.x, item.y, r, 0, Math.PI*2);
+        const r = 7; targetCtx.beginPath(); targetCtx.arc(item.x, item.y, r, 0, Math.PI*2);
         item.type === 'stamp-dot' ? targetCtx.fill() : targetCtx.stroke();
-        if (item.type === 'stamp-double') { 
-            targetCtx.beginPath(); targetCtx.arc(item.x, item.y, r*0.6, 0, Math.PI*2); targetCtx.stroke(); 
-        }
+        if (item.type === 'stamp-double') { targetCtx.beginPath(); targetCtx.arc(item.x, item.y, r*0.6, 0, Math.PI*2); targetCtx.stroke(); }
     } else if (item.points && item.points.length > 0) {
-        targetCtx.beginPath();
-        targetCtx.moveTo(item.points[0].x, item.points[0].y);
+        targetCtx.beginPath(); targetCtx.moveTo(item.points[0].x, item.points[0].y);
         for(let i=1; i<item.points.length; i++) targetCtx.lineTo(item.points[i].x, item.points[i].y);
         targetCtx.stroke();
     }
@@ -223,17 +196,13 @@ function drawCore(targetCtx, item, alpha = 1) {
 
 function render() {
     const dpr = window.devicePixelRatio || 1;
-    ctx.save();
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.save(); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = "#f1f5f9"; ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
     ctx.restore();
 
     ctx.save();
     ctx.translate(view.x, view.y); ctx.scale(view.scale, view.scale); ctx.translate(-currentPaper.w/2, -currentPaper.h/2);
-    
-    // 用紙描画
     ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, currentPaper.w, currentPaper.h);
-    
     if (mapImage.complete && mapImage.naturalWidth > 0) {
         const s = Math.min(currentPaper.w/mapImage.naturalWidth, currentPaper.h/mapImage.naturalHeight);
         ctx.drawImage(mapImage, (currentPaper.w-mapImage.naturalWidth*s)/2, (currentPaper.h-mapImage.naturalHeight*s)/2, mapImage.naturalWidth*s, mapImage.naturalHeight*s);
@@ -245,7 +214,6 @@ function render() {
         drawCore(ctx, {type: mode, x: pt.x, y: pt.y, color: currentColor}, 0.5);
     }
     ctx.restore();
-
     if (mode === 'window' && windowRect) {
         ctx.save();
         ctx.translate(view.x, view.y); ctx.scale(view.scale, view.scale); ctx.translate(-currentPaper.w/2, -currentPaper.h/2);
@@ -271,13 +239,11 @@ function exportImageWithWindow() {
     a.download = `${projectName}_${getFormattedDate()}.png`; a.click();
 }
 
-// 共通ポインタ処理
 window.addEventListener('pointermove', e => {
     currentMousePos = { x: e.clientX, y: e.clientY };
     const idx = lastPointers.findIndex(p => p.pointerId === e.pointerId);
     if (idx !== -1) {
-        const oldPointers = [...lastPointers];
-        lastPointers[idx] = e;
+        const oldPointers = [...lastPointers]; lastPointers[idx] = e;
         lastPointers.sort((a,b) => a.pointerId - b.pointerId);
         const pt = toCanvas(e.clientX, e.clientY);
         if (isPanning) {
@@ -288,8 +254,7 @@ window.addEventListener('pointermove', e => {
                 if (do_ > 0) {
                     const ratio = dn / do_;
                     const mx = (p1n.clientX + p2n.clientX) / 2, my = (p1n.clientY + p2n.clientY) / 2;
-                    view.x = mx - (mx - view.x) * ratio; view.y = my - (my - view.y) * ratio;
-                    view.scale *= ratio;
+                    view.x = mx - (mx - view.x) * ratio; view.y = my - (my - view.y) * ratio; view.scale *= ratio;
                 }
                 view.x += ((p1n.clientX - p1o.clientX) + (p2n.clientX - p2o.clientX)) / 2;
                 view.y += ((p1n.clientY - p1o.clientY) + (p2n.clientY - p2o.clientY)) / 2;
@@ -307,8 +272,7 @@ window.addEventListener('pointermove', e => {
 });
 
 canvas.addEventListener('pointerdown', e => {
-    lastPointers.push(e);
-    const pt = toCanvas(e.clientX, e.clientY);
+    lastPointers.push(e); const pt = toCanvas(e.clientX, e.clientY);
     if (e.button === 2 || lastPointers.length > 1) { isPanning = true; currentPath = null; return; }
     if (mode === 'window') { windowStart = pt; windowRect = null; return; }
     if (pt.x < 0 || pt.x > currentPaper.w || pt.y < 0 || pt.y > currentPaper.h) return;
@@ -336,18 +300,15 @@ window.addEventListener('pointerup', handlePointerUp);
 window.addEventListener('pointercancel', handlePointerUp);
 
 canvas.addEventListener('wheel', e => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    e.preventDefault(); const delta = e.deltaY > 0 ? 0.9 : 1.1;
     view.x = e.clientX - (e.clientX - view.x) * delta; view.y = e.clientY - (e.clientY - view.y) * delta;
     view.scale *= delta; requestRender();
 }, { passive: false });
 
 function undo() { if(allPaths.length > 0) { allPaths.pop(); queueAutosave(); requestRender(); } }
 function toggleToolbar() { document.getElementById('toolbar').classList.toggle('hidden'); }
-
 function setMode(m) {
-    mode = m;
-    const btns = { draw: 'btn-draw', erase: 'btn-erase', window: 'btn-window', 'stamp-circle': 'btn-s1', 'stamp-dot': 'btn-s2', 'stamp-double': 'btn-s3' };
+    mode = m; const btns = { draw: 'btn-draw', erase: 'btn-erase', window: 'btn-window', 'stamp-circle': 'btn-s1', 'stamp-dot': 'btn-s2', 'stamp-double': 'btn-s3' };
     document.querySelectorAll('#toolbar button').forEach(b => b.classList.remove('active'));
     if (btns[m] && document.getElementById(btns[m])) document.getElementById(btns[m]).classList.add('active');
     requestRender();
@@ -367,27 +328,20 @@ function resetView() {
     view = { x: window.innerWidth/2, y: window.innerHeight/2, scale: s }; 
     requestRender(); 
 }
-
 function getFormattedDate() { const now = new Date(); return `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`; }
 
 function exportProjectJSON() {
     const fileName = `${projectName}_${getFormattedDate()}.json`;
-    const a = document.createElement('a'); 
-    a.href = URL.createObjectURL(new Blob([JSON.stringify({map:mapImage.src, paths:allPaths, projectName, paperSize: currentPaper})], {type:\"application/json\"}));
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({map:mapImage.src, paths:allPaths, projectName, paperSize: currentPaper})], {type:"application/json"}));
     a.download = fileName; a.click();
 }
 
 function importProjectJSON(i) {
-    const r = new FileReader();
-    r.onload = e => {
+    const r = new FileReader(); r.onload = e => {
         try {
-            const d = JSON.parse(e.target.result);
-            allPaths = d.paths || []; 
-            projectName = d.projectName || "imported";
-            currentPaper = d.paperSize || PAPER_CONFIG.A3; // 保存データから復元
-            mapImage = new Image(); 
-            mapImage.onload = () => { resetView(); requestRender(); }; 
-            mapImage.src = d.map || "";
+            const d = JSON.parse(e.target.result); allPaths = d.paths || []; projectName = d.projectName || "imported";
+            currentPaper = d.paperSize || PAPER_CONFIG.A3; mapImage = new Image(); 
+            mapImage.onload = () => { resetView(); requestRender(); }; mapImage.src = d.map || "";
             document.getElementById('start-overlay').style.display = 'none';
         } catch(err) { alert("読込失敗"); }
     };
@@ -395,29 +349,24 @@ function importProjectJSON(i) {
 }
 
 function exportDXF() {
-    const fileName = `${projectName}_${getFormattedDate()}.dxf`;
     let d = "  0\nSECTION\n  2\nENTITIES\n";
     allPaths.forEach(i => {
         if (i.points) {
             d += "  0\nPOLYLINE\n  8\n0\n 66\n 1\n 70\n 0\n";
-            i.points.forEach(p => d += `  0\nVERTEX\n  8\n0\n 10\n${p.x}\n 20\n${-p.y}\n`);
-            d += "  0\nSEQEND\n";
+            i.points.forEach(p => d += `  0\nVERTEX\n  8\n0\n 10\n${p.x}\n 20\n${-p.y}\n`); d += "  0\nSEQEND\n";
         } else if (i.type.startsWith('stamp')) {
             d += `  0\nCIRCLE\n  8\n0\n 10\n${i.x}\n 20\n${-i.y}\n 40\n7.0\n`;
             if (i.type === 'stamp-double') d += `  0\nCIRCLE\n  8\n0\n 10\n${i.x}\n 20\n${-i.y}\n 40\n4.2\n`;
         }
     });
     d += "  0\nENDSEC\n  0\nEOF";
-    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([d], {type: "application/dxf"})); a.download = fileName; a.click();
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([d], {type: "application/dxf"})); 
+    a.download = `${projectName}_${getFormattedDate()}.dxf`; a.click();
 }
 
 function exportGeoJSON() {
     const features = allPaths.map(item => ({
-        type: "Feature",
-        geometry: { 
-            type: item.points ? "LineString" : "Point", 
-            coordinates: item.points ? item.points.map(p => [p.x, -p.y]) : [item.x, -item.y] 
-        },
+        type: "Feature", geometry: { type: item.points ? "LineString" : "Point", coordinates: item.points ? item.points.map(p => [p.x, -p.y]) : [item.x, -item.y] },
         properties: { type: item.type, color: item.color }
     }));
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({type: "FeatureCollection", features})], {type: "application/json"}));
@@ -425,12 +374,7 @@ function exportGeoJSON() {
 }
 
 document.getElementById('mapInput').onchange = e => {
-    const r = new FileReader(); 
-    r.onload = f => { 
-        mapImage = new Image(); 
-        mapImage.onload = () => { resetView(); requestRender(); }; 
-        mapImage.src = f.target.result; 
-    };
+    const r = new FileReader(); r.onload = f => { mapImage = new Image(); mapImage.onload = () => { resetView(); requestRender(); }; mapImage.src = f.target.result; };
     if(e.target.files[0]) r.readAsDataURL(e.target.files[0]);
 };
 
