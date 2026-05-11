@@ -3,49 +3,81 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>猛禽類調査野帳 - Standard Stable</title>
+    <title>調査野帳 - Stable Integrated</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
-        :root { --accent: #2563eb; --bg-panel: rgba(255, 255, 255, 0.9); --border: #e2e8f0; --text: #1e293b; }
-        body { margin: 0; overflow: hidden; background: #f1f5f9; font-family: sans-serif; position: fixed; width: 100%; height: 100%; touch-action: none; }
-        #toolbar { position: fixed; top: 15px; left: 15px; z-index: 1000; background: var(--bg-panel); backdrop-filter: blur(8px); padding: 12px; border-radius: 12px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 180px; border: 1px solid var(--border); transition: 0.3s; }
-        #toolbar.hidden { transform: translateX(-220px); }
-        #toggle-btn { position: fixed; top: 15px; left: 15px; z-index: 1001; width: 40px; height: 40px; background: var(--accent); color: white; border: none; border-radius: 8px; cursor: pointer; }
-        #start-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 9999; display: flex; align-items: center; justify-content: center; color: white; }
-        .start-card { background: white; padding: 25px; border-radius: 15px; width: 300px; color: #333; }
-        button { padding: 8px; cursor: pointer; border: 1px solid #ccc; background: #fff; border-radius: 5px; font-size: 13px; }
-        button.active { background: var(--accent); color: white; }
-        canvas { display: block; touch-action: none; }
+        :root { --accent: #2563eb; --bg-panel: rgba(255, 255, 255, 0.95); --border: #e2e8f0; --text: #1e293b; }
+        body { margin: 0; overflow: hidden; background: #f1f5f9; font-family: sans-serif; position: fixed; width: 100%; height: 100%; touch-action: none; color: var(--text); }
+        #toolbar { position: fixed; top: 15px; left: 15px; z-index: 1000; background: var(--bg-panel); backdrop-filter: blur(8px); padding: 15px; border-radius: 12px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); width: 200px; border: 1px solid var(--border); transition: 0.3s; max-height: 90vh; overflow-y: auto; }
+        #toolbar.hidden { transform: translateX(-240px); }
+        #toggle-btn { position: fixed; top: 15px; left: 15px; z-index: 1001; width: 44px; height: 44px; background: var(--accent); color: white; border: none; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+        #start-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.9); z-index: 9999; display: flex; align-items: center; justify-content: center; }
+        .start-card { background: white; padding: 30px; border-radius: 20px; width: 90%; max-width: 350px; }
+        .btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+        button { padding: 10px 5px; cursor: pointer; border: 1px solid var(--border); background: #fff; border-radius: 8px; font-size: 13px; }
+        button.active { background: var(--accent); color: white; border-color: var(--accent); }
+        #colorPicker { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 5px; }
+        .color-btn { width: 28px; height: 28px; border-radius: 6px; cursor: pointer; border: 2px solid transparent; }
+        .color-btn.selected { border-color: #000; box-shadow: 0 0 0 2px var(--accent); }
+        .section-title { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 4px; }
+        canvas { display: block; background: transparent; }
     </style>
 </head>
 <body>
 
 <div id="start-overlay">
     <div class="start-card">
-        <h3>新規調査開始</h3>
-        <input type="text" id="project-name" placeholder="プロジェクト名" style="width:100%; margin-bottom:10px; padding:8px; box-sizing:border-box;">
-        <select id="paper-size" style="width:100%; margin-bottom:15px; padding:8px;"><option value="A3">A3 (横)</option><option value="A4">A4 (横)</option></select>
-        <button onclick="startApp()" style="width:100%; background:var(--accent); color:white;">開始</button>
+        <h2 style="margin-top:0">調査野帳 開始</h2>
+        <input type="text" id="project-input" placeholder="調査名" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ccc; border-radius:5px; box-sizing:border-box;">
+        <select id="paper-size-select" style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ccc; border-radius:5px;">
+            <option value="A3">A3 (横向き)</option>
+            <option value="A4">A4 (横向き)</option>
+        </select>
+        <button onclick="startApp()" style="width:100%; background:var(--accent); color:white; font-weight:bold; margin-bottom:10px;">新規開始</button>
+        <div id="resume-area" style="display:none; border-top:1px solid #eee; pt:10px;">
+            <button onclick="resumeApp()" style="width:100%; background:#10b981; color:white; margin-top:10px;">前回の続きから再開</button>
+        </div>
     </div>
 </div>
 
 <button id="toggle-btn" onclick="document.getElementById('toolbar').classList.toggle('hidden')">☰</button>
 
 <div id="toolbar">
-    <button onclick="exportZip()" style="background:#10b981; color:white;">保存 (ZIP)</button>
-    <button onclick="undo()">↩ 戻る</button>
-    <button onclick="resetView()">位置リセット</button>
-    <hr style="width:100%; border:0; border-top:1px solid #eee;">
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:5px;">
-        <button id="btn-draw" class="active" onclick="setMode('draw')">ペン</button>
-        <button id="btn-erase" onclick="setMode('erase')">消ゴム</button>
+    <div class="section">
+        <div class="section-title">Project</div>
+        <button onclick="exportZip()" style="width:100%; background:#10b981; color:white; font-weight:bold;">📦 保存 (ZIP)</button>
+        <div class="btn-group" style="margin-top:5px;">
+            <button onclick="undo()">↩ 戻る</button>
+            <button onclick="resetView()">リセット</button>
+        </div>
     </div>
-    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:5px;">
-        <button id="btn-s1" onclick="setMode('stamp-circle')">〇</button>
-        <button id="btn-s2" onclick="setMode('stamp-dot')">●</button>
-        <button id="btn-s3" onclick="setMode('stamp-double')">◎</button>
+
+    <div class="section">
+        <div class="section-title">Tools</div>
+        <div class="btn-group">
+            <button id="btn-draw" class="active" onclick="setMode('draw')">ペン</button>
+            <button id="btn-erase" onclick="setMode('erase')">消しゴム</button>
+        </div>
     </div>
-    <input type="file" id="map-input" accept="image/*" style="font-size:10px;">
+
+    <div class="section">
+        <div class="section-title">Stamps</div>
+        <div class="btn-group" style="grid-template-columns: 1fr 1fr 1fr;">
+            <button id="btn-s1" onclick="setMode('stamp-circle')">〇</button>
+            <button id="btn-s2" onclick="setMode('stamp-dot')">●</button>
+            <button id="btn-s3" onclick="setMode('stamp-double')">◎</button>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Colors</div>
+        <div id="colorPicker"></div>
+    </div>
+
+    <div class="section" style="margin-top:5px;">
+        <div class="section-title">Basemap</div>
+        <input type="file" id="map-input" accept="image/*" style="font-size:10px; width:100%;">
+    </div>
 </div>
 
 <canvas id="mainCanvas"></canvas>
@@ -54,101 +86,125 @@
 const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 const PAPER = { A3: {w: 1587, h: 1123}, A4: {w: 1123, h: 794} };
+
 let config = { w: 1587, h: 1123 }, projectName = "";
 let view = { x: 50, y: 50, scale: 0.5 };
 let allPaths = [], currentPath = null;
-let mode = 'draw', pointers = [], isPanning = false;
+let mode = 'draw', currentColor = '#ef4444', pointers = [], isPanning = false;
 let mapImg = new Image(), mousePos = {x:0, y:0};
 
-function init() {
+// --- 初期化 & IndexedDB ---
+async function startApp() {
+    projectName = document.getElementById('project-input').value || "Survey";
+    config = PAPER[document.getElementById('paper-size-select').value];
+    document.getElementById('start-overlay').style.display = "none";
+    setup();
+}
+
+async function resumeApp() {
+    const data = JSON.parse(localStorage.getItem('field_note_save'));
+    if (data) {
+        allPaths = data.allPaths;
+        config = data.config;
+        projectName = data.projectName || "Survey";
+        if (data.mapData) mapImg.src = data.mapData;
+    }
+    document.getElementById('start-overlay').style.display = "none";
+    setup();
+}
+
+function setup() {
     window.addEventListener('resize', resize);
+    createColorPicker();
     resize();
-    render();
+    resetView();
+    if (mapImg.src) mapImg.onload = render;
+    requestAnimationFrame(renderLoop);
 }
 
-function resize() {
-    canvas.width = window.innerWidth * window.devicePixelRatio;
-    canvas.height = window.innerHeight * window.devicePixelRatio;
-    render();
-}
-
-// 用紙座標への変換（最もシンプルな逆変換）
+// --- 座標計算 (Standard方式: 最も狂わない) ---
 function getPos(e) {
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left);
-    const y = (e.clientY - rect.top);
-    return {
-        x: (x - view.x) / view.scale,
-        y: (y - view.y) / view.scale
-    };
+    const x = e.clientX;
+    const y = e.clientY;
+    return { x: (x - view.x) / view.scale, y: (y - view.y) / view.scale };
 }
 
-function render() {
-    const dpr = window.devicePixelRatio;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // リセット
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+// --- 描画ロジック ---
+let needsRender = true;
+function render() { needsRender = true; }
 
-    ctx.save();
-    ctx.translate(view.x, view.y);
-    ctx.scale(view.scale, view.scale);
+function renderLoop() {
+    if (needsRender) {
+        const dpr = window.devicePixelRatio || 1;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
 
-    // 用紙
-    ctx.fillStyle = "white";
-    ctx.fillRect(0, 0, config.w, config.h);
-    ctx.strokeStyle = "#ccc";
-    ctx.strokeRect(0, 0, config.w, config.h);
+        ctx.save();
+        ctx.translate(view.x, view.y);
+        ctx.scale(view.scale, view.scale);
 
-    // 地図
-    if (mapImg.src) {
-        const s = Math.min(config.w/mapImg.naturalWidth, config.h/mapImg.naturalHeight);
-        ctx.drawImage(mapImg, (config.w-mapImg.naturalWidth*s)/2, (config.h-mapImg.naturalHeight*s)/2, mapImg.naturalWidth*s, mapImg.naturalHeight*s);
+        // 用紙
+        ctx.fillStyle = "white";
+        ctx.fillRect(0, 0, config.w, config.h);
+        ctx.strokeStyle = "#ccc";
+        ctx.strokeRect(0, 0, config.w, config.h);
+
+        // 背景
+        if (mapImg.complete && mapImg.naturalWidth > 0) {
+            const s = Math.min(config.w/mapImg.naturalWidth, config.h/mapImg.naturalHeight);
+            ctx.drawImage(mapImg, (config.w-mapImg.naturalWidth*s)/2, (config.h-mapImg.naturalHeight*s)/2, mapImg.naturalWidth*s, mapImg.naturalHeight*s);
+        }
+
+        // 保存済みデータ
+        allPaths.forEach(p => drawItem(ctx, p));
+        if (currentPath) drawItem(ctx, currentPath);
+
+        // ゴースト (ペンモード以外で表示)
+        if (mode !== 'draw' && mode !== 'erase' && !isPanning) {
+            const pt = getPos({clientX: mousePos.x, clientY: mousePos.y});
+            ctx.globalAlpha = 0.5;
+            drawItem(ctx, {type: mode, x: pt.x, y: pt.y, color: currentColor});
+            ctx.globalAlpha = 1.0;
+        }
+        ctx.restore();
+        needsRender = false;
     }
-
-    // 描画
-    allPaths.forEach(p => drawItem(ctx, p));
-    if (currentPath) drawItem(ctx, currentPath);
-
-    // ゴースト
-    if (mode.startsWith('stamp') && !isPanning) {
-        const pt = getPos({clientX: mousePos.x, clientY: mousePos.y});
-        ctx.globalAlpha = 0.5;
-        drawItem(ctx, {type: mode, x: pt.x, y: pt.y, color: "red"});
-        ctx.globalAlpha = 1.0;
-    }
-    ctx.restore();
+    requestAnimationFrame(renderLoop);
 }
 
 function drawItem(tCtx, item) {
     tCtx.beginPath();
-    tCtx.strokeStyle = tCtx.fillStyle = item.color || "red";
+    tCtx.strokeStyle = tCtx.fillStyle = item.color || currentColor;
     tCtx.lineWidth = 2;
+    tCtx.lineCap = "round";
     if (item.points) {
         tCtx.moveTo(item.points[0].x, item.points[0].y);
         item.points.forEach(pt => tCtx.lineTo(pt.x, pt.y));
         tCtx.stroke();
     } else {
-        tCtx.arc(item.x, item.y, 7, 0, Math.PI*2);
+        const r = 7;
+        tCtx.arc(item.x, item.y, r, 0, Math.PI*2);
         item.type === 'stamp-dot' ? tCtx.fill() : tCtx.stroke();
         if (item.type === 'stamp-double') {
-            tCtx.beginPath(); tCtx.arc(item.x, item.y, 4, 0, Math.PI*2); tCtx.stroke();
+            tCtx.beginPath(); tCtx.arc(item.x, item.y, r*0.6, 0, Math.PI*2); tCtx.stroke();
         }
     }
 }
 
-// --- イベント ---
+// --- イベント制御 ---
 canvas.addEventListener('pointerdown', e => {
     pointers.push(e);
     const pt = getPos(e);
     if (e.button === 2 || pointers.length > 1) {
-        isPanning = true;
-        currentPath = null;
+        isPanning = true; currentPath = null;
     } else if (mode === 'draw') {
-        currentPath = { points: [pt], color: "red" };
+        currentPath = { points: [pt], color: currentColor };
     } else if (mode === 'erase') {
         allPaths = allPaths.filter(p => {
             const hit = p.points ? p.points.some(d => Math.hypot(d.x-pt.x, d.y-pt.y) < 15/view.scale) : Math.hypot(p.x-pt.x, p.y-pt.y) < 15/view.scale;
             return !hit;
         });
+        autoSave();
     }
     render();
 });
@@ -157,10 +213,8 @@ window.addEventListener('pointermove', e => {
     mousePos = {x: e.clientX, y: e.clientY};
     const idx = pointers.findIndex(p => p.pointerId === e.pointerId);
     if (idx === -1) { render(); return; }
-    
     const prev = pointers[idx];
     const pt = getPos(e);
-    
     if (isPanning) {
         view.x += e.clientX - prev.clientX;
         view.y += e.clientY - prev.clientY;
@@ -175,10 +229,10 @@ window.addEventListener('pointermove', e => {
 window.addEventListener('pointerup', e => {
     if (pointers.length === 1 && !isPanning && mode.startsWith('stamp')) {
         const pt = getPos(e);
-        allPaths.push({type: mode, x: pt.x, y: pt.y, color: "red"});
+        allPaths.push({type: mode, x: pt.x, y: pt.y, color: currentColor});
+        autoSave();
     }
-    if (currentPath) allPaths.push(currentPath);
-    currentPath = null;
+    if (currentPath) { allPaths.push(currentPath); currentPath = null; autoSave(); }
     pointers = pointers.filter(p => p.pointerId !== e.pointerId);
     if (pointers.length === 0) isPanning = false;
     render();
@@ -194,37 +248,57 @@ canvas.addEventListener('wheel', e => {
     render();
 }, {passive: false});
 
-// --- 管理 ---
-function startApp() {
-    projectName = document.getElementById('project-name').value || "Survey";
-    config = PAPER[document.getElementById('paper-size').value];
-    document.getElementById('start-overlay').style.display = "none";
-    resetView();
-    init();
+// --- ツール機能 ---
+function createColorPicker() {
+    const cp = document.getElementById('colorPicker');
+    ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#0f172a'].forEach(c => {
+        const b = document.createElement('div');
+        b.className = 'color-btn' + (c === currentColor ? ' selected' : '');
+        b.style.background = c;
+        b.onclick = () => { currentColor = c; createColorPicker(); render(); };
+        cp.appendChild(b);
+    });
 }
-function resetView() {
-    view = { x: 50, y: 50, scale: Math.min((window.innerWidth-100)/config.w, (window.innerHeight-100)/config.h) };
-    render();
-}
+
 function setMode(m) {
     mode = m;
     document.querySelectorAll('#toolbar button').forEach(b => b.classList.remove('active'));
-    const btnId = { draw:'btn-draw', erase:'btn-erase', 'stamp-circle':'btn-s1', 'stamp-dot':'btn-s2', 'stamp-double':'btn-s3' }[m];
-    if(btnId) document.getElementById(btnId).classList.add('active');
+    const id = {draw:'btn-draw', erase:'btn-erase', 'stamp-circle':'btn-s1', 'stamp-dot':'btn-s2', 'stamp-double':'btn-s3'}[m];
+    if(id) document.getElementById(id).classList.add('active');
     render();
 }
-function undo() { allPaths.pop(); render(); }
-document.getElementById('map-input').onchange = e => {
-    const reader = new FileReader();
-    reader.onload = f => { mapImg.src = f.target.result; mapImg.onload = render; };
-    reader.readAsDataURL(e.target.files[0]);
-};
+
+function undo() { allPaths.pop(); autoSave(); render(); }
+function resetView() {
+    const s = Math.min((window.innerWidth-100)/config.w, (window.innerHeight-100)/config.h);
+    view = { x: (window.innerWidth - config.w*s)/2, y: (window.innerHeight - config.h*s)/2, scale: s };
+    render();
+}
+function resize() {
+    canvas.width = window.innerWidth * (window.devicePixelRatio || 1);
+    canvas.height = window.innerHeight * (window.devicePixelRatio || 1);
+    render();
+}
+
+function autoSave() {
+    const data = { allPaths, config, projectName, mapData: mapImg.src.startsWith('data') ? mapImg.src : null };
+    localStorage.setItem('field_note_save', JSON.stringify(data));
+}
+
 async function exportZip() {
     const zip = new JSZip();
-    zip.file("data.json", JSON.stringify({allPaths, config}));
+    zip.file("data.json", JSON.stringify({allPaths, config, projectName}));
     const blob = await zip.generateAsync({type:"blob"});
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = projectName+".zip"; a.click();
 }
+
+document.getElementById('map-input').onchange = e => {
+    const r = new FileReader();
+    r.onload = f => { mapImg = new Image(); mapImg.onload = () => { resetView(); autoSave(); }; mapImg.src = f.target.result; };
+    if(e.target.files[0]) r.readAsDataURL(e.target.files[0]);
+};
+
+if(localStorage.getItem('field_note_save')) document.getElementById('resume-area').style.display = 'block';
 </script>
 </body>
 </html>
