@@ -3,18 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>猛禽類調査野帳 - Practical Edition</title>
+    <title>猛禽類調査野帳 - Professional Multi-Size</title>
     <style>
-        /* スタイルは前回を継承しつつ微調整 */
+        /* 前回のスタイルを継承 */
         :root { --accent: #2563eb; --bg-panel: rgba(255, 255, 255, 0.9); --border: #e2e8f0; --text: #1e293b; }
         body { margin: 0; overflow: hidden; background: #f1f5f9; font-family: sans-serif; position: fixed; width: 100%; height: 100%; touch-action: none; }
         #toolbar { position: fixed; top: 20px; left: 20px; z-index: 1000; background: var(--bg-panel); backdrop-filter: blur(10px); padding: 16px; border-radius: 16px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 220px; max-height: 85vh; overflow-y: auto; border: 1px solid var(--border); transition: transform 0.3s; }
         #toolbar.hidden { transform: translateX(-280px); }
         #toggle-btn { position: fixed; top: 20px; left: 20px; z-index: 1001; width: 44px; height: 44px; background: var(--accent); color: white; border: none; border-radius: 12px; cursor: pointer; font-size: 20px; display: flex; align-items: center; justify-content: center; }
         #start-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(8px); z-index: 9999; display: flex; align-items: center; justify-content: center; }
-        .start-card { background: white; padding: 32px; border-radius: 20px; width: 90%; max-width: 400px; text-align: center; }
-        .start-card input { width: 100%; padding: 12px; margin: 15px 0; border: 2px solid var(--border); border-radius: 8px; font-size: 16px; box-sizing: border-box; }
-        .start-card button { width: 100%; padding: 12px; background: var(--accent); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-bottom: 10px; }
+        .start-card { background: white; padding: 32px; border-radius: 20px; width: 90%; max-width: 420px; text-align: center; }
+        .start-card h2 { margin-top: 0; color: var(--text); }
+        .start-card input, .start-card select { width: 100%; padding: 12px; margin: 8px 0; border: 2px solid var(--border); border-radius: 8px; font-size: 16px; box-sizing: border-box; }
+        .start-card .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
+        .start-card button { width: 100%; padding: 12px; background: var(--accent); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-bottom: 8px; }
         .section { display: flex; flex-direction: column; gap: 6px; }
         .section-title { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; }
         .btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
@@ -33,6 +35,16 @@
     <div class="start-card">
         <h2>調査開始</h2>
         <input type="text" id="project-name-input" placeholder="業務名を入力">
+        <div class="grid-2">
+            <select id="paper-size">
+                <option value="A3">用紙: A3</option>
+                <option value="A4">用紙: A4</option>
+            </select>
+            <select id="paper-orient">
+                <option value="LANDSCAPE">向き: 横</option>
+                <option value="PORTRAIT">向き: 縦</option>
+            </select>
+        </div>
         <button onclick="startProject()">新規開始</button>
         <button onclick="document.getElementById('importFile').click()" style="background: #64748b;">既存ファイル読込</button>
         <div id="resume-area" style="display:none; margin-top:10px; border-top:1px solid #eee; padding-top:10px;">
@@ -86,14 +98,21 @@
 <canvas id="viewport"></canvas>
 
 <script>
-const A3_W = 1587, A3_H = 1123;
-const canvas = document.getElementById('viewport');
-const ctx = canvas.getContext('2d');
+// サイズ定数
+const PAPER_CONFIG = {
+    A3: { w: 1587, h: 1123 }, // 96dpi換算
+    A4: { w: 1123, h: 794 }
+};
+
+let currentPaper = { w: 1587, h: 1123 }; // 初期値
 let mapImage = new Image(), allPaths = [], currentPath = null;
 let mode = 'draw', currentColor = '#ef4444', view = { x: 0, y: 0, scale: 0.5 };
 let lastPointers = [], isPanning = false, needsRender = true, isVisible = true;
 let windowStart = null, windowRect = null, projectName = "";
 let currentMousePos = null, saveTimer = null;
+
+const canvas = document.getElementById('viewport');
+const ctx = canvas.getContext('2d');
 
 function init() {
     window.addEventListener('resize', () => { resize(); requestRender(); });
@@ -114,10 +133,26 @@ function renderLoop() {
     requestAnimationFrame(renderLoop);
 }
 
+// 用紙設定の適用
+function applyPaperSize(sizeKey, orient) {
+    const base = PAPER_CONFIG[sizeKey] || PAPER_CONFIG.A3;
+    if (orient === 'PORTRAIT') {
+        currentPaper = { w: base.h, h: base.w };
+    } else {
+        currentPaper = { w: base.w, h: base.h };
+    }
+}
+
 function startProject() {
     projectName = document.getElementById('project-name-input').value.trim();
     if (!projectName) return alert("業務名を入力してください");
+    
+    const sizeKey = document.getElementById('paper-size').value;
+    const orient = document.getElementById('paper-orient').value;
+    applyPaperSize(sizeKey, orient);
+    
     document.getElementById('start-overlay').style.display = 'none';
+    resetView();
 }
 
 function resumeLastSession() {
@@ -125,6 +160,12 @@ function resumeLastSession() {
         const data = JSON.parse(localStorage.getItem('field_note_autosave'));
         allPaths = data.paths || [];
         projectName = data.projectName || "復元データ";
+        // 保存データからサイズを復元（データにない場合はA3横）
+        if (data.paperSize) {
+            currentPaper = data.paperSize;
+        } else {
+            applyPaperSize('A3', 'LANDSCAPE');
+        }
         mapImage = new Image();
         mapImage.onload = () => { resetView(); requestRender(); };
         mapImage.src = data.map || "";
@@ -132,12 +173,11 @@ function resumeLastSession() {
     } catch(e) { alert("復元に失敗しました"); }
 }
 
-// デバウンス付きオートセーブ
 function queueAutosave() {
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
         try {
-            const data = { projectName, paths: allPaths, map: mapImage.src };
+            const data = { projectName, paths: allPaths, map: mapImage.src, paperSize: currentPaper };
             localStorage.setItem('field_note_autosave', JSON.stringify(data));
         } catch(e) { console.warn("Autosave failed: Storage full"); }
     }, 1500); 
@@ -153,7 +193,10 @@ function resize() {
 }
 
 function toCanvas(sx, sy) {
-    return { x: (sx - view.x) / view.scale + A3_W / 2, y: (sy - view.y) / view.scale + A3_H / 2 };
+    return { 
+        x: (sx - view.x) / view.scale + currentPaper.w / 2, 
+        y: (sy - view.y) / view.scale + currentPaper.h / 2 
+    };
 }
 
 function drawCore(targetCtx, item, alpha = 1) {
@@ -186,11 +229,14 @@ function render() {
     ctx.restore();
 
     ctx.save();
-    ctx.translate(view.x, view.y); ctx.scale(view.scale, view.scale); ctx.translate(-A3_W/2, -A3_H/2);
-    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, A3_W, A3_H);
+    ctx.translate(view.x, view.y); ctx.scale(view.scale, view.scale); ctx.translate(-currentPaper.w/2, -currentPaper.h/2);
+    
+    // 用紙描画
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, currentPaper.w, currentPaper.h);
+    
     if (mapImage.complete && mapImage.naturalWidth > 0) {
-        const s = Math.min(A3_W/mapImage.naturalWidth, A3_H/mapImage.naturalHeight);
-        ctx.drawImage(mapImage, (A3_W-mapImage.naturalWidth*s)/2, (A3_H-mapImage.naturalHeight*s)/2, mapImage.naturalWidth*s, mapImage.naturalHeight*s);
+        const s = Math.min(currentPaper.w/mapImage.naturalWidth, currentPaper.h/mapImage.naturalHeight);
+        ctx.drawImage(mapImage, (currentPaper.w-mapImage.naturalWidth*s)/2, (currentPaper.h-mapImage.naturalHeight*s)/2, mapImage.naturalWidth*s, mapImage.naturalHeight*s);
     }
     allPaths.forEach(i => drawCore(ctx, i));
     if (currentPath) drawCore(ctx, currentPath);
@@ -202,7 +248,7 @@ function render() {
 
     if (mode === 'window' && windowRect) {
         ctx.save();
-        ctx.translate(view.x, view.y); ctx.scale(view.scale, view.scale); ctx.translate(-A3_W/2, -A3_H/2);
+        ctx.translate(view.x, view.y); ctx.scale(view.scale, view.scale); ctx.translate(-currentPaper.w/2, -currentPaper.h/2);
         ctx.strokeStyle = "rgba(37, 99, 235, 0.8)"; ctx.lineWidth = 2/view.scale; ctx.setLineDash([5/view.scale, 5/view.scale]);
         ctx.strokeRect(windowRect.x, windowRect.y, windowRect.w, windowRect.h);
         ctx.restore();
@@ -217,14 +263,15 @@ function exportImageWithWindow() {
     octx.translate(-windowRect.x, -windowRect.y);
     octx.fillStyle = "#fff"; octx.fillRect(windowRect.x, windowRect.y, windowRect.w, windowRect.h);
     if (mapImage.complete) {
-        const s = Math.min(A3_W/mapImage.naturalWidth, A3_H/mapImage.naturalHeight);
-        octx.drawImage(mapImage, (A3_W-mapImage.naturalWidth*s)/2, (A3_H-mapImage.naturalHeight*s)/2, mapImage.naturalWidth*s, mapImage.naturalHeight*s);
+        const s = Math.min(currentPaper.w/mapImage.naturalWidth, currentPaper.h/mapImage.naturalHeight);
+        octx.drawImage(mapImage, (currentPaper.w-mapImage.naturalWidth*s)/2, (currentPaper.h-mapImage.naturalHeight*s)/2, mapImage.naturalWidth*s, mapImage.naturalHeight*s);
     }
     allPaths.forEach(i => drawCore(octx, i));
     const a = document.createElement('a'); a.href = off.toDataURL("image/png");
     a.download = `${projectName}_${getFormattedDate()}.png`; a.click();
 }
 
+// 共通ポインタ処理
 window.addEventListener('pointermove', e => {
     currentMousePos = { x: e.clientX, y: e.clientY };
     const idx = lastPointers.findIndex(p => p.pointerId === e.pointerId);
@@ -264,7 +311,7 @@ canvas.addEventListener('pointerdown', e => {
     const pt = toCanvas(e.clientX, e.clientY);
     if (e.button === 2 || lastPointers.length > 1) { isPanning = true; currentPath = null; return; }
     if (mode === 'window') { windowStart = pt; windowRect = null; return; }
-    if (pt.x < 0 || pt.x > A3_W || pt.y < 0 || pt.y > A3_H) return;
+    if (pt.x < 0 || pt.x > currentPaper.w || pt.y < 0 || pt.y > currentPaper.h) return;
     if (mode.startsWith('stamp')) { allPaths.push({type: mode, x: pt.x, y: pt.y, color: currentColor}); queueAutosave(); }
     else if (mode === 'draw') currentPath = {points: [pt], color: currentColor};
     else if (mode === 'erase') {
@@ -315,12 +362,18 @@ function createColorButtons() {
     });
 }
 
-function resetView() { const s = Math.min((window.innerWidth-100)/A3_W, (window.innerHeight-100)/A3_H); view = { x: window.innerWidth/2, y: window.innerHeight/2, scale: s }; requestRender(); }
+function resetView() { 
+    const s = Math.min((window.innerWidth-100)/currentPaper.w, (window.innerHeight-100)/currentPaper.h); 
+    view = { x: window.innerWidth/2, y: window.innerHeight/2, scale: s }; 
+    requestRender(); 
+}
+
 function getFormattedDate() { const now = new Date(); return `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`; }
 
 function exportProjectJSON() {
     const fileName = `${projectName}_${getFormattedDate()}.json`;
-    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({map:mapImage.src, paths:allPaths, projectName})], {type:"application/json"}));
+    const a = document.createElement('a'); 
+    a.href = URL.createObjectURL(new Blob([JSON.stringify({map:mapImage.src, paths:allPaths, projectName, paperSize: currentPaper})], {type:\"application/json\"}));
     a.download = fileName; a.click();
 }
 
@@ -329,8 +382,12 @@ function importProjectJSON(i) {
     r.onload = e => {
         try {
             const d = JSON.parse(e.target.result);
-            allPaths = d.paths || []; projectName = d.projectName || "imported";
-            mapImage = new Image(); mapImage.onload = () => { resetView(); requestRender(); }; mapImage.src = d.map || "";
+            allPaths = d.paths || []; 
+            projectName = d.projectName || "imported";
+            currentPaper = d.paperSize || PAPER_CONFIG.A3; // 保存データから復元
+            mapImage = new Image(); 
+            mapImage.onload = () => { resetView(); requestRender(); }; 
+            mapImage.src = d.map || "";
             document.getElementById('start-overlay').style.display = 'none';
         } catch(err) { alert("読込失敗"); }
     };
@@ -357,7 +414,10 @@ function exportDXF() {
 function exportGeoJSON() {
     const features = allPaths.map(item => ({
         type: "Feature",
-        geometry: { type: item.points ? "LineString" : "Point", coordinates: item.points ? item.points.map(p => [p.x, -p.y]) : [item.x, -item.y] },
+        geometry: { 
+            type: item.points ? "LineString" : "Point", 
+            coordinates: item.points ? item.points.map(p => [p.x, -p.y]) : [item.x, -item.y] 
+        },
         properties: { type: item.type, color: item.color }
     }));
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({type: "FeatureCollection", features})], {type: "application/json"}));
@@ -365,7 +425,12 @@ function exportGeoJSON() {
 }
 
 document.getElementById('mapInput').onchange = e => {
-    const r = new FileReader(); r.onload = f => { mapImage = new Image(); mapImage.onload = () => { resetView(); requestRender(); }; mapImage.src = f.target.result; };
+    const r = new FileReader(); 
+    r.onload = f => { 
+        mapImage = new Image(); 
+        mapImage.onload = () => { resetView(); requestRender(); }; 
+        mapImage.src = f.target.result; 
+    };
     if(e.target.files[0]) r.readAsDataURL(e.target.files[0]);
 };
 
