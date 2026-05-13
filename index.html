@@ -45,7 +45,7 @@
             width: 90%; max-width: 400px; text-align: center; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
         }
         .start-card h2 { margin-top: 0; color: var(--text); }
-        .start-card input {
+        .start-card input[type="text"] {
             width: 100%; padding: 12px; margin: 15px 0; border: 2px solid var(--border);
             border-radius: 8px; font-size: 16px; box-sizing: border-box;
         }
@@ -53,6 +53,8 @@
             width: 100%; padding: 12px; background: var(--accent); color: white;
             border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-bottom: 10px;
         }
+        .size-selector { text-align: left; margin: 15px 0; padding: 10px; background: #f8fafc; border-radius: 8px; }
+        .size-selector label { display: block; margin: 8px 0; cursor: pointer; font-size: 14px; color: var(--text); }
 
         .section { display: flex; flex-direction: column; gap: 6px; }
         .section-title { font-size: 11px; font-weight: 700; color: #64748b; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 2px; }
@@ -83,6 +85,13 @@
         <h2>調査開始</h2>
         <p style="color: #64748b; font-size: 14px;">新規プロジェクト名を入力</p>
         <input type="text" id="project-name-input" placeholder="例: 〇〇地区 猛禽類調査">
+        
+        <div class="size-selector">
+            <p style="margin:0 0 8px 0; font-weight: bold; font-size: 12px; color: #64748b;">用紙サイズを選択</p>
+            <label><input type="radio" name="paper-size" value="A3_LANDSCAPE" checked> A3横 (420x297mm)</label>
+            <label><input type="radio" name="paper-size" value="A4_PORTRAIT"> A4縦 (210x297mm)</label>
+        </div>
+
         <button onclick="startProject()">新規開始</button>
         <div style="margin: 15px 0; border-top: 1px solid #e2e8f0; padding-top: 15px;">
             <p style="color: #64748b; font-size: 14px;">または既存ファイルから再開</p>
@@ -146,7 +155,12 @@
 <canvas id="viewport"></canvas>
 
 <script>
-const A3_W = 1587, A3_H = 1123;
+const SIZES = {
+    A3_LANDSCAPE: { w: 1587, h: 1123 },
+    A4_PORTRAIT:  { w: 842,  h: 1191 }
+};
+
+let currentSize = SIZES.A3_LANDSCAPE;
 const canvas = document.getElementById('viewport');
 const ctx = canvas.getContext('2d');
 let mapImage = new Image(), allPaths = [], currentPath = null;
@@ -154,7 +168,7 @@ let mode = 'draw', currentColor = '#ef4444', view = { x: 0, y: 0, scale: 0.5 };
 let lastPointers = [], isPanning = false;
 let windowStart = null, windowRect = null;
 let projectName = ""; 
-let currentMousePos = null; // プレビュー用
+let currentMousePos = null;
 
 function init() {
     window.addEventListener('resize', resize);
@@ -169,8 +183,14 @@ function init() {
 function startProject() {
     const input = document.getElementById('project-name-input');
     if (!input.value.trim()) { alert("業務名を入力してください。"); return; }
+    
+    // サイズ選択の反映
+    const selectedSizeKey = document.querySelector('input[name="paper-size"]:checked').value;
+    currentSize = SIZES[selectedSizeKey];
+    
     projectName = input.value.trim();
     document.getElementById('start-overlay').style.display = 'none';
+    resetView();
 }
 
 function getFormattedDate() {
@@ -180,8 +200,14 @@ function getFormattedDate() {
 
 function exportProjectJSON() {
     const fileName = `${projectName}_${getFormattedDate()}.json`;
+    const data = {
+        map: mapImage.src, 
+        paths: allPaths, 
+        projectName: projectName,
+        currentSize: currentSize // サイズ設定も保存
+    };
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([JSON.stringify({map:mapImage.src, paths:allPaths, projectName:projectName})], {type:"application/json"}));
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], {type:"application/json"}));
     a.download = fileName;
     a.click();
 }
@@ -223,13 +249,6 @@ function exportGeoJSON() {
     a.click();
 }
 
-window.addEventListener('beforeunload', (e) => {
-    if (allPaths.length > 0) {
-        e.preventDefault();
-        e.returnValue = ''; 
-    }
-});
-
 function resize() {
     const dpr = window.devicePixelRatio || 1;
     canvas.width = window.innerWidth * dpr;
@@ -241,7 +260,10 @@ function resize() {
 }
 
 function toCanvas(sx, sy) {
-    return { x: (sx - view.x) / view.scale + A3_W / 2, y: (sy - view.y) / view.scale + A3_H / 2 };
+    return { 
+        x: (sx - view.x) / view.scale + currentSize.w / 2, 
+        y: (sy - view.y) / view.scale + currentSize.h / 2 
+    };
 }
 
 function render() {
@@ -254,12 +276,12 @@ function render() {
     ctx.save();
     ctx.translate(view.x, view.y);
     ctx.scale(view.scale, view.scale);
-    ctx.translate(-A3_W/2, -A3_H/2);
-    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, A3_W, A3_H);
+    ctx.translate(-currentSize.w/2, -currentSize.h/2);
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, currentSize.w, currentSize.h);
     
     if (mapImage.complete && mapImage.naturalWidth > 0) {
-        const s = Math.min(A3_W/mapImage.naturalWidth, A3_H/mapImage.naturalHeight);
-        ctx.drawImage(mapImage, (A3_W-mapImage.naturalWidth*s)/2, (A3_H-mapImage.naturalHeight*s)/2, mapImage.naturalWidth*s, mapImage.naturalHeight*s);
+        const s = Math.min(currentSize.w/mapImage.naturalWidth, currentSize.h/mapImage.naturalHeight);
+        ctx.drawImage(mapImage, (currentSize.w-mapImage.naturalWidth*s)/2, (currentSize.h-mapImage.naturalHeight*s)/2, mapImage.naturalWidth*s, mapImage.naturalHeight*s);
     }
 
     const drawItem = (item, alpha = 1) => {
@@ -285,7 +307,6 @@ function render() {
     allPaths.forEach(i => drawItem(i));
     if (currentPath) drawItem(currentPath);
 
-    // スタンププレビュー描画
     if (mode.startsWith('stamp') && currentMousePos && !isPanning) {
         const pt = toCanvas(currentMousePos.x, currentMousePos.y);
         drawItem({type: mode, x: pt.x, y: pt.y, color: currentColor}, 0.5);
@@ -309,7 +330,6 @@ window.addEventListener('pointermove', e => {
 
         if (isPanning) {
             if (lastPointers.length >= 2) {
-                // ピンチ操作
                 const p1_o = oldPointers[0], p2_o = oldPointers[1];
                 const p1_n = lastPointers[0], p2_n = lastPointers[1];
                 const dist_o = Math.hypot(p1_o.clientX - p2_o.clientX, p1_o.clientY - p2_o.clientY);
@@ -325,7 +345,6 @@ window.addEventListener('pointermove', e => {
                 view.x += ((p1_n.clientX - p1_o.clientX) + (p2_n.clientX - p2_o.clientX)) / 2;
                 view.y += ((p1_n.clientY - p1_o.clientY) + (p2_n.clientY - p2_o.clientY)) / 2;
             } else {
-                // 1本指パン
                 view.x += e.clientX - oldPointers[idx].clientX;
                 view.y += e.clientY - oldPointers[idx].clientY;
             }
@@ -343,7 +362,7 @@ canvas.addEventListener('pointerdown', e => {
     const pt = toCanvas(e.clientX, e.clientY);
     if (e.button === 2 || lastPointers.length > 1) { isPanning = true; currentPath = null; return; }
     if (mode === 'window') { windowStart = pt; return; }
-    if (pt.x < 0 || pt.x > A3_W || pt.y < 0 || pt.y > A3_H) return;
+    if (pt.x < 0 || pt.x > currentSize.w || pt.y < 0 || pt.y > currentSize.h) return;
     if (mode.startsWith('stamp')) { allPaths.push({type: mode, x: pt.x, y: pt.y, color: currentColor}); }
     else if (mode === 'draw') currentPath = {points: [pt], color: currentColor};
     else if (mode === 'erase') {
@@ -389,7 +408,7 @@ function createColorButtons() {
 }
 
 function resetView() {
-    const s = Math.min((window.innerWidth-100)/A3_W, (window.innerHeight-100)/A3_H);
+    const s = Math.min((window.innerWidth-100)/currentSize.w, (window.innerHeight-100)/currentSize.h);
     view = { x: window.innerWidth/2, y: window.innerHeight/2, scale: s }; render();
 }
 
@@ -402,6 +421,7 @@ function importProjectJSON(i) {
             const d = JSON.parse(e.target.result); 
             allPaths = d.paths || [];
             projectName = d.projectName || "復元プロジェクト";
+            currentSize = d.currentSize || SIZES.A3_LANDSCAPE; // サイズ復元
             mapImage = new Image(); 
             mapImage.onload = () => { resetView(); render(); }; 
             mapImage.src = d.map || "";
