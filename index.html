@@ -285,7 +285,7 @@ function render() {
         ctx.save();
         ctx.globalAlpha = alpha;
         ctx.strokeStyle = ctx.fillStyle = item.color;
-        ctx.lineWidth = 2;
+        ctx.lineWidth = (item.type === 'draw') ? 1 : 2;
         if (item.type && item.type.startsWith('stamp')) {
             const r = 7;
             ctx.beginPath(); ctx.arc(item.x, item.y, r, 0, Math.PI*2);
