@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>猛禽類調査野帳プロトタイプ</title>
+    <title>猛禽類調査野帳プロトタイプ V4</title>
     <style>
         :root { 
             --accent: #2563eb; 
@@ -16,7 +16,6 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
             position: fixed; width: 100%; height: 100%; touch-action: none; 
         }
-        
         #toolbar { 
             position: fixed; top: 20px; left: 20px; z-index: 1000; 
             background: var(--bg-panel); backdrop-filter: blur(10px);
@@ -26,7 +25,6 @@
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
         #toolbar.hidden { transform: translateX(-260px); opacity: 0; }
-
         #toggle-btn {
             position: fixed; top: 20px; left: 20px; z-index: 1001;
             width: 44px; height: 44px; background: var(--accent); color: white;
@@ -34,7 +32,6 @@
             box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
             display: flex; align-items: center; justify-content: center;
         }
-
         #start-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(8px);
@@ -55,12 +52,10 @@
         }
         .size-selector { text-align: left; margin: 15px 0; padding: 10px; background: #f8fafc; border-radius: 8px; }
         .size-selector label { display: block; margin: 8px 0; cursor: pointer; font-size: 14px; color: var(--text); }
-
         .section { display: flex; flex-direction: column; gap: 6px; }
         .section-title { font-size: 11px; font-weight: 700; color: #64748b; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 2px; }
         .btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
         .btn-group.triple { grid-template-columns: 1fr 1fr 1fr; }
-
         button { 
             padding: 10px 8px; cursor: pointer; border: 1px solid var(--border); 
             background: #fff; border-radius: 8px; font-size: 12px; font-weight: 500;
@@ -69,11 +64,9 @@
         }
         button:hover { background: #f8fafc; border-color: #cbd5e1; }
         button.active { background: var(--accent); color: white; border-color: var(--accent); box-shadow: 0 4px 10px rgba(37, 99, 235, 0.2); }
-
         #colorPicker { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 0; }
         .color-btn { width: 26px; height: 26px; border-radius: 8px; border: 2px solid transparent; cursor: pointer; transition: transform 0.2s; }
         .color-btn.selected { transform: scale(1.2); border-color: #fff; box-shadow: 0 0 0 2px var(--accent); }
-
         canvas { display: block; background: transparent; cursor: crosshair; }
         .file-label { font-size: 11px; background: #f1f5f9; padding: 8px; border-radius: 8px; border: 1px dashed #cbd5e1; text-align: center; cursor: pointer; }
     </style>
@@ -149,7 +142,7 @@
     <div class="section" style="margin-top: 10px; border-top: 1px solid var(--border); padding-top: 15px;">
         <button onclick="exportDXF()" style="width:100%; margin-bottom:6px;">📐 AutoCAD用 (DXF)</button>
         <button onclick="exportGeoJSON()" style="width:100%; margin-bottom:6px; background:#f0fdf4; color:#166534; border-color:#bbf7d0;">🌍 QGIS用 (GeoJSON)</button>
-        <button onclick="exportImageWithWindow()" style="width:100%; background:#eff6ff; color:var(--accent); border-color:#bfdbfe;">📸 PNG画像出力</button>
+        <button onclick="exportImageWithWindow()" style="width:100%; background:#eff6ff; color:var(--accent); border-color:#bfdbfe;">📸 高画質PNG出力</button>
     </div>
 </div>
 
@@ -157,7 +150,7 @@
 
 <script>
 const SIZES = {
-    A3_LANDSCAPE: { w: 1587, h: 1123 },
+    A3_LANDSCAPE: { w: 1587, h: 1123 }, // 72dpi相当
     A4_PORTRAIT:  { w: 842,  h: 1191 }
 };
 
@@ -197,35 +190,46 @@ function getFormattedDate() {
 }
 
 function exportProjectJSON() {
-    const fileName = `${projectName}_${getFormattedDate()}.json`;
     const data = { map: mapImage.src, paths: allPaths, projectName: projectName, currentSize: currentSize };
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], {type:"application/json"}));
-    a.download = fileName; a.click();
+    a.download = `${projectName}_${getFormattedDate()}.json`;
+    a.click();
 }
 
 function exportDXF() {
     const fileName = `${projectName}_${getFormattedDate()}.dxf`;
-    let d = "  0\nSECTION\n  2\nHEADER\n  9\n$ACADVER\n  1\nAC1009\n  0\nENDSEC\n  0\nSECTION\n  2\nENTITIES\n";
+    const w = currentSize.w, h = currentSize.h;
+    
+    let d = "  0\nSECTION\n  2\nHEADER\n  9\n$ACADVER\n  1\nAC1009\n";
+    d += `  9\n$EXTMIN\n 10\n0.0\n 20\n${-h}\n  9\n$EXTMAX\n 10\n${w}\n 20\n0.0\n`;
+    d += "  0\nENDSEC\n  0\nSECTION\n  2\nENTITIES\n";
+
+    // 用紙枠の自動生成
+    d += `  0\nPOLYLINE\n  8\nPaper_Outline\n 66\n 1\n`;
+    [[0,0],[w,0],[w,h],[0,h],[0,0]].forEach(p => d += `  0\nVERTEX\n  8\nPaper_Outline\n 10\n${p[0]}\n 20\n${-p[1]}\n`);
+    d += "  0\nSEQEND\n";
+
+    // 描画データの出力
     allPaths.forEach(i => {
+        const layer = (i.type === 'arrow') ? "Arrows" : "Survey_Notes";
         if (i.points && i.points.length > 1) {
-            d += `  0\nPOLYLINE\n  8\nSurvey\n 66\n 1\n`;
-            i.points.forEach(p => d += `  0\nVERTEX\n  8\nSurvey\n 10\n${p.x}\n 20\n${-p.y}\n`);
+            d += `  0\nPOLYLINE\n  8\n${layer}\n 66\n 1\n`;
+            i.points.forEach(p => d += `  0\nVERTEX\n  8\n${layer}\n 10\n${p.x}\n 20\n${-p.y}\n`);
             d += "  0\nSEQEND\n";
         } else if (i.type && i.type.startsWith('stamp')) {
             const r = 7.0;
-            d += `  0\nCIRCLE\n  8\nSurvey\n 10\n${i.x}\n 20\n${-i.y}\n 40\n${r}\n`;
-            if (i.type === 'stamp-double') d += `  0\nCIRCLE\n  8\nSurvey\n 10\n${i.x}\n 20\n${-i.y}\n 40\n${r*0.6}\n`;
+            d += `  0\nCIRCLE\n  8\nStamps\n 10\n${i.x}\n 20\n${-i.y}\n 40\n${r}\n`;
+            if (i.type === 'stamp-double') d += `  0\nCIRCLE\n  8\nStamps\n 10\n${i.x}\n 20\n${-i.y}\n 40\n${r*0.6}\n`;
         }
     });
     d += "  0\nENDSEC\n  0\nEOF";
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([d], {type: "application/dxf"}));
+    a.href = URL.createObjectURL(new Blob([d.replace(/\\n/g, '\n')], {type: "application/dxf"}));
     a.download = fileName; a.click();
 }
 
 function exportGeoJSON() {
-    const fileName = `${projectName}_${getFormattedDate()}.geojson`;
     const features = allPaths.map(item => ({
         type: "Feature",
         geometry: {
@@ -236,31 +240,58 @@ function exportGeoJSON() {
     }));
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([JSON.stringify({type: "FeatureCollection", features: features})], {type: "application/json"}));
-    a.download = fileName; a.click();
+    a.download = `${projectName}_${getFormattedDate()}.geojson`;
+    a.click();
 }
 
 function resize() {
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = window.innerWidth * dpr;
-    canvas.height = window.innerHeight * dpr;
-    canvas.style.width = window.innerWidth + 'px';
-    canvas.style.height = window.innerHeight + 'px';
+    canvas.width = window.innerWidth * dpr; canvas.height = window.innerHeight * dpr;
+    canvas.style.width = window.innerWidth + 'px'; canvas.style.height = window.innerHeight + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     render();
 }
 
 function toCanvas(sx, sy) {
-    return { 
-        x: (sx - view.x) / view.scale + currentSize.w / 2, 
-        y: (sy - view.y) / view.scale + currentSize.h / 2 
-    };
+    return { x: (sx - view.x) / view.scale + currentSize.w / 2, y: (sy - view.y) / view.scale + currentSize.h / 2 };
 }
 
 function fromCanvas(cx, cy) {
-    return {
-        x: (cx - currentSize.w / 2) * view.scale + view.x,
-        y: (cy - currentSize.h / 2) * view.scale + view.y
+    return { x: (cx - currentSize.w / 2) * view.scale + view.x, y: (cy - currentSize.h / 2) * view.scale + view.y };
+}
+
+function renderOnCtx(targetCtx, w, h, isExport = false) {
+    targetCtx.fillStyle = "#fff"; targetCtx.fillRect(0, 0, w, h);
+    if (mapImage.complete && mapImage.naturalWidth > 0) {
+        const s = Math.min(w/mapImage.naturalWidth, h/mapImage.naturalHeight);
+        targetCtx.drawImage(mapImage, (w-mapImage.naturalWidth*s)/2, (h-mapImage.naturalHeight*s)/2, mapImage.naturalWidth*s, mapImage.naturalHeight*s);
+    }
+    const drawItem = (item) => {
+        targetCtx.save();
+        targetCtx.strokeStyle = targetCtx.fillStyle = item.color;
+        targetCtx.lineWidth = (item.type === 'draw') ? 1 : 2;
+        if (item.type && item.type.startsWith('stamp')) {
+            const r = 7; targetCtx.beginPath(); targetCtx.arc(item.x, item.y, r, 0, Math.PI*2);
+            item.type === 'stamp-dot' ? targetCtx.fill() : targetCtx.stroke();
+            if (item.type === 'stamp-double') { targetCtx.beginPath(); targetCtx.arc(item.x, item.y, r*0.6, 0, Math.PI*2); targetCtx.stroke(); }
+        } else if (item.points && item.points.length > 0) {
+            targetCtx.beginPath(); targetCtx.lineCap = targetCtx.lineJoin = "round";
+            targetCtx.moveTo(item.points[0].x, item.points[0].y);
+            item.points.forEach(p => targetCtx.lineTo(p.x, p.y)); targetCtx.stroke();
+            if (item.type === 'arrow' && item.points.length >= 2) {
+                const p2 = item.points[item.points.length-1], p1 = item.points[item.points.length-2];
+                const angle = Math.atan2(p2.y-p1.y, p2.x-p1.x), head = 15;
+                targetCtx.beginPath(); targetCtx.moveTo(p2.x,p2.y);
+                targetCtx.lineTo(p2.x-head*Math.cos(angle-Math.PI/6), p2.y-head*Math.sin(angle-Math.PI/6));
+                targetCtx.moveTo(p2.x,p2.y);
+                targetCtx.lineTo(p2.x-head*Math.cos(angle+Math.PI/6), p2.y-head*Math.sin(angle+Math.PI/6));
+                targetCtx.stroke();
+            }
+        }
+        targetCtx.restore();
     };
+    allPaths.forEach(i => drawItem(i));
+    if (currentPath) drawItem(currentPath);
 }
 
 function render() {
@@ -274,57 +305,19 @@ function render() {
     ctx.translate(view.x, view.y);
     ctx.scale(view.scale, view.scale);
     ctx.translate(-currentSize.w/2, -currentSize.h/2);
-    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, currentSize.w, currentSize.h);
-    
-    if (mapImage.complete && mapImage.naturalWidth > 0) {
-        const s = Math.min(currentSize.w/mapImage.naturalWidth, currentSize.h/mapImage.naturalHeight);
-        ctx.drawImage(mapImage, (currentSize.w-mapImage.naturalWidth*s)/2, (currentSize.h-mapImage.naturalHeight*s)/2, mapImage.naturalWidth*s, mapImage.naturalHeight*s);
-    }
-
-    const drawItem = (item, alpha = 1) => {
-        ctx.save();
-        ctx.globalAlpha = alpha;
-        ctx.strokeStyle = ctx.fillStyle = item.color;
-        ctx.lineWidth = (item.type === 'draw') ? 1 : 2;
-        if (item.type && item.type.startsWith('stamp')) {
-            const r = 7;
-            ctx.beginPath(); ctx.arc(item.x, item.y, r, 0, Math.PI*2);
-            item.type === 'stamp-dot' ? ctx.fill() : ctx.stroke();
-            if (item.type === 'stamp-double') {
-                ctx.beginPath(); ctx.arc(item.x, item.y, r*0.6, 0, Math.PI*2); ctx.stroke();
-            }
-        } else if (item.points && item.points.length > 0) {
-            ctx.beginPath(); ctx.lineCap = ctx.lineJoin = "round";
-            ctx.moveTo(item.points[0].x, item.points[0].y);
-            item.points.forEach(p => ctx.lineTo(p.x, p.y)); ctx.stroke();
-            
-            // ★矢印モードで描かれた線、または描画中のプレビューが矢印モードの場合のみハネを描く
-            if (item.type === 'arrow' && item.points.length >= 2) {
-                const p2 = item.points[item.points.length-1], p1 = item.points[item.points.length-2];
-                const angle = Math.atan2(p2.y-p1.y, p2.x-p1.x), head = 15;
-                ctx.beginPath(); ctx.moveTo(p2.x,p2.y);
-                ctx.lineTo(p2.x-head*Math.cos(angle-Math.PI/6), p2.y-head*Math.sin(angle-Math.PI/6));
-                ctx.moveTo(p2.x,p2.y);
-                ctx.lineTo(p2.x-head*Math.cos(angle+Math.PI/6), p2.y-head*Math.sin(angle+Math.PI/6));
-                ctx.stroke();
-            }
-        }
-        ctx.restore();
-    };
-    
-    allPaths.forEach(i => drawItem(i));
-    if (currentPath) drawItem(currentPath);
+    renderOnCtx(ctx, currentSize.w, currentSize.h);
 
     if (mode.startsWith('stamp') && currentMousePos && !isPanning) {
         const pt = toCanvas(currentMousePos.x, currentMousePos.y);
-        drawItem({type: mode, x: pt.x, y: pt.y, color: currentColor}, 0.5);
+        ctx.globalAlpha = 0.5;
+        const r = 7; ctx.strokeStyle = ctx.fillStyle = currentColor;
+        ctx.beginPath(); ctx.arc(pt.x, pt.y, r, 0, Math.PI*2);
+        mode === 'stamp-dot' ? ctx.fill() : ctx.stroke();
+        ctx.globalAlpha = 1.0;
     }
-
     if (windowRect) {
-        ctx.save();
-        ctx.strokeStyle = "rgba(37, 99, 235, 0.8)"; ctx.lineWidth = 2/view.scale; ctx.setLineDash([5/view.scale, 5/view.scale]);
-        ctx.strokeRect(windowRect.x, windowRect.y, windowRect.w, windowRect.h);
-        ctx.restore();
+        ctx.save(); ctx.strokeStyle = "rgba(37, 99, 235, 0.8)"; ctx.lineWidth = 2/view.scale; ctx.setLineDash([5/view.scale, 5/view.scale]);
+        ctx.strokeRect(windowRect.x, windowRect.y, windowRect.w, windowRect.h); ctx.restore();
     }
     ctx.restore();
 }
@@ -333,8 +326,7 @@ window.addEventListener('pointermove', e => {
     currentMousePos = { x: e.clientX, y: e.clientY };
     const idx = lastPointers.findIndex(p => p.pointerId === e.pointerId);
     if (idx !== -1) {
-        const oldPointers = [...lastPointers];
-        lastPointers[idx] = e;
+        const oldPointers = [...lastPointers]; lastPointers[idx] = e;
         const pt = toCanvas(e.clientX, e.clientY);
         if (isPanning) {
             if (lastPointers.length >= 2) {
@@ -353,9 +345,7 @@ window.addEventListener('pointermove', e => {
             }
         } else if (mode === 'window' && windowStart) {
             windowRect = { x: Math.min(windowStart.x, pt.x), y: Math.min(windowStart.y, pt.y), w: Math.abs(pt.x - windowStart.x), h: Math.abs(pt.y - windowStart.y) };
-        } else if (currentPath) {
-            currentPath.points.push(pt);
-        }
+        } else if (currentPath) { currentPath.points.push(pt); }
     }
     render();
 });
@@ -379,10 +369,7 @@ canvas.addEventListener('pointerdown', e => {
 
 window.addEventListener('pointerup', e => {
     lastPointers = lastPointers.filter(p => p.pointerId !== e.pointerId);
-    if (lastPointers.length === 0) { 
-        isPanning = false; windowStart = null; 
-        if (currentPath) { allPaths.push(currentPath); currentPath = null; } 
-    }
+    if (lastPointers.length === 0) { isPanning = false; windowStart = null; if (currentPath) { allPaths.push(currentPath); currentPath = null; } }
     render();
 });
 
@@ -419,14 +406,28 @@ function undo() { if(allPaths.length > 0) { allPaths.pop(); render(); } }
 
 function exportImageWithWindow() {
     if (!windowRect) { alert("印刷窓を選択してください"); return; }
-    const screenPos = fromCanvas(windowRect.x, windowRect.y);
-    const screenW = windowRect.w * view.scale, screenH = windowRect.h * view.scale;
-    const dpr = window.devicePixelRatio || 1;
-    const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = screenW * dpr; tempCanvas.height = screenH * dpr;
-    const tCtx = tempCanvas.getContext('2d');
-    tCtx.drawImage(canvas, screenPos.x*dpr, screenPos.y*dpr, screenW*dpr, screenH*dpr, 0, 0, screenW*dpr, screenH*dpr);
-    const a = document.createElement('a'); a.href = tempCanvas.toDataURL("image/png"); a.download = `${projectName}_output.png`; a.click();
+    
+    // 高画質化のため、元データサイズ用のオフスクリーンキャンバスを作成
+    const offCanvas = document.createElement('canvas');
+    offCanvas.width = currentSize.w;
+    offCanvas.height = currentSize.h;
+    const offCtx = offCanvas.getContext('2d');
+    
+    // 地図と全パスを原寸大で一度レンダリング
+    renderOnCtx(offCtx, currentSize.w, currentSize.h, true);
+    
+    // 印刷窓の範囲だけを切り出す
+    const exportCanvas = document.createElement('canvas');
+    exportCanvas.width = windowRect.w;
+    exportCanvas.height = windowRect.h;
+    const exportCtx = exportCanvas.getContext('2d');
+    
+    exportCtx.drawImage(offCanvas, windowRect.x, windowRect.y, windowRect.w, windowRect.h, 0, 0, windowRect.w, windowRect.h);
+    
+    const a = document.createElement('a');
+    a.href = exportCanvas.toDataURL("image/png");
+    a.download = `${projectName}_highres.png`;
+    a.click();
 }
 
 function importProjectJSON(i) {
