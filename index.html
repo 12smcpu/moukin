@@ -166,7 +166,7 @@ const ctx = canvas.getContext('2d');
 let mapImage = new Image(), allPaths = [], currentPath = null;
 let mode = 'draw', currentColor = '#ef4444', view = { x: 0, y: 0, scale: 0.5 };
 let lastPointers = [], isPanning = false;
-let windowStart = null, windowRect = null;
+let windowStart = null, windowRect = null; // windowRectもキャンバス座標で持つ
 let projectName = ""; 
 let currentMousePos = null;
 
@@ -183,11 +183,8 @@ function init() {
 function startProject() {
     const input = document.getElementById('project-name-input');
     if (!input.value.trim()) { alert("業務名を入力してください。"); return; }
-    
-    // サイズ選択の反映
     const selectedSizeKey = document.querySelector('input[name="paper-size"]:checked').value;
     currentSize = SIZES[selectedSizeKey];
-    
     projectName = input.value.trim();
     document.getElementById('start-overlay').style.display = 'none';
     resetView();
@@ -201,15 +198,11 @@ function getFormattedDate() {
 function exportProjectJSON() {
     const fileName = `${projectName}_${getFormattedDate()}.json`;
     const data = {
-        map: mapImage.src, 
-        paths: allPaths, 
-        projectName: projectName,
-        currentSize: currentSize // サイズ設定も保存
+        map: mapImage.src, paths: allPaths, projectName: projectName, currentSize: currentSize
     };
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], {type:"application/json"}));
-    a.download = fileName;
-    a.click();
+    a.download = fileName; a.click();
 }
 
 function exportDXF() {
@@ -229,8 +222,7 @@ function exportDXF() {
     d += "  0\nENDSEC\n  0\nEOF";
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([d], {type: "application/dxf"}));
-    a.download = fileName;
-    a.click();
+    a.download = fileName; a.click();
 }
 
 function exportGeoJSON() {
@@ -245,8 +237,7 @@ function exportGeoJSON() {
     }));
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([JSON.stringify({type: "FeatureCollection", features: features})], {type: "application/json"}));
-    a.download = fileName;
-    a.click();
+    a.download = fileName; a.click();
 }
 
 function resize() {
@@ -263,6 +254,14 @@ function toCanvas(sx, sy) {
     return { 
         x: (sx - view.x) / view.scale + currentSize.w / 2, 
         y: (sy - view.y) / view.scale + currentSize.h / 2 
+    };
+}
+
+// キャンバス座標からスクリーン座標へ逆変換（画像出力用）
+function fromCanvas(cx, cy) {
+    return {
+        x: (cx - currentSize.w / 2) * view.scale + view.x,
+        y: (cy - currentSize.h / 2) * view.scale + view.y
     };
 }
 
@@ -284,12 +283,11 @@ function render() {
         ctx.drawImage(mapImage, (currentSize.w-mapImage.naturalWidth*s)/2, (currentSize.h-mapImage.naturalHeight*s)/2, mapImage.naturalWidth*s, mapImage.naturalHeight*s);
     }
 
-const drawItem = (item, alpha = 1) => {
+    const drawItem = (item, alpha = 1) => {
         ctx.save();
         ctx.globalAlpha = alpha;
         ctx.strokeStyle = ctx.fillStyle = item.color;
         ctx.lineWidth = 2;
-
         if (item.type && item.type.startsWith('stamp')) {
             const r = 7;
             ctx.beginPath(); ctx.arc(item.x, item.y, r, 0, Math.PI*2);
@@ -298,29 +296,16 @@ const drawItem = (item, alpha = 1) => {
                 ctx.beginPath(); ctx.arc(item.x, item.y, r*0.6, 0, Math.PI*2); ctx.stroke();
             }
         } else if (item.points && item.points.length > 0) {
-            // 1. メインの線を描画
-            ctx.beginPath(); 
-            ctx.lineCap = ctx.lineJoin = "round";
+            ctx.beginPath(); ctx.lineCap = ctx.lineJoin = "round";
             ctx.moveTo(item.points[0].x, item.points[0].y);
-            item.points.forEach(p => ctx.lineTo(p.x, p.y)); 
-            ctx.stroke();
-
-            // 2. 矢印の「頭」を画面表示用に追加（2点以上ある場合のみ）
+            item.points.forEach(p => ctx.lineTo(p.x, p.y)); ctx.stroke();
             if (item.points.length >= 2) {
-                const p2 = item.points[item.points.length - 1]; // 終点
-                const p1 = item.points[item.points.length - 2]; // 終点の一つ前
-                
-                // 線の角度を計算
-                const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
-                const headLen = 15; // 矢印のハネの長さ
-                
-                ctx.beginPath();
-                // 片方のハネ
-                ctx.moveTo(p2.x, p2.y);
-                ctx.lineTo(p2.x - headLen * Math.cos(angle - Math.PI / 6), p2.y - headLen * Math.sin(angle - Math.PI / 6));
-                // もう片方のハネ
-                ctx.moveTo(p2.x, p2.y);
-                ctx.lineTo(p2.x - headLen * Math.cos(angle + Math.PI / 6), p2.y - headLen * Math.sin(angle + Math.PI / 6));
+                const p2 = item.points[item.points.length-1], p1 = item.points[item.points.length-2];
+                const angle = Math.atan2(p2.y-p1.y, p2.x-p1.x), head = 15;
+                ctx.beginPath(); ctx.moveTo(p2.x,p2.y);
+                ctx.lineTo(p2.x-head*Math.cos(angle-Math.PI/6), p2.y-head*Math.sin(angle-Math.PI/6));
+                ctx.moveTo(p2.x,p2.y);
+                ctx.lineTo(p2.x-head*Math.cos(angle+Math.PI/6), p2.y-head*Math.sin(angle+Math.PI/6));
                 ctx.stroke();
             }
         }
@@ -334,13 +319,18 @@ const drawItem = (item, alpha = 1) => {
         const pt = toCanvas(currentMousePos.x, currentMousePos.y);
         drawItem({type: mode, x: pt.x, y: pt.y, color: currentColor}, 0.5);
     }
+
+    // 印刷窓の描画（キャンバス座標に基づいて描くのでズレません）
+    if (windowRect) {
+        ctx.save();
+        ctx.strokeStyle = "rgba(37, 99, 235, 0.8)"; 
+        ctx.lineWidth = 2 / view.scale; // ズームしても線の太さを一定に見せる
+        ctx.setLineDash([5/view.scale, 5/view.scale]);
+        ctx.strokeRect(windowRect.x, windowRect.y, windowRect.w, windowRect.h);
+        ctx.restore();
+    }
     
     ctx.restore();
-
-    if (mode === 'window' && windowRect) {
-        ctx.strokeStyle = "rgba(37, 99, 235, 0.8)"; ctx.lineWidth = 2; ctx.setLineDash([5, 5]);
-        ctx.strokeRect(windowRect.x, windowRect.y, windowRect.w, windowRect.h); ctx.setLineDash([]);
-    }
 }
 
 window.addEventListener('pointermove', e => {
@@ -350,26 +340,20 @@ window.addEventListener('pointermove', e => {
         const oldPointers = [...lastPointers];
         lastPointers[idx] = e;
         const pt = toCanvas(e.clientX, e.clientY);
-
         if (isPanning) {
             if (lastPointers.length >= 2) {
-                const p1_o = oldPointers[0], p2_o = oldPointers[1];
-                const p1_n = lastPointers[0], p2_n = lastPointers[1];
+                const p1_o = oldPointers[0], p2_o = oldPointers[1], p1_n = lastPointers[0], p2_n = lastPointers[1];
                 const dist_o = Math.hypot(p1_o.clientX - p2_o.clientX, p1_o.clientY - p2_o.clientY);
                 const dist_n = Math.hypot(p1_n.clientX - p2_n.clientX, p1_n.clientY - p2_n.clientY);
                 if (dist_o > 0) {
                     const ratio = dist_n / dist_o;
-                    const mx = (p1_n.clientX + p2_n.clientX) / 2;
-                    const my = (p1_n.clientY + p2_n.clientY) / 2;
-                    view.x = mx - (mx - view.x) * ratio;
-                    view.y = my - (my - view.y) * ratio;
-                    view.scale *= ratio;
+                    const mx = (p1_n.clientX + p2_n.clientX) / 2, my = (p1_n.clientY + p2_n.clientY) / 2;
+                    view.x = mx - (mx - view.x) * ratio; view.y = my - (my - view.y) * ratio; view.scale *= ratio;
                 }
                 view.x += ((p1_n.clientX - p1_o.clientX) + (p2_n.clientX - p2_o.clientX)) / 2;
                 view.y += ((p1_n.clientY - p1_o.clientY) + (p2_n.clientY - p2_o.clientY)) / 2;
             } else {
-                view.x += e.clientX - oldPointers[idx].clientX;
-                view.y += e.clientY - oldPointers[idx].clientY;
+                view.x += e.clientX - oldPointers[idx].clientX; view.y += e.clientY - oldPointers[idx].clientY;
             }
         } else if (mode === 'window' && windowStart) {
             windowRect = { x: Math.min(windowStart.x, pt.x), y: Math.min(windowStart.y, pt.y), w: Math.abs(pt.x - windowStart.x), h: Math.abs(pt.y - windowStart.y) };
@@ -384,7 +368,7 @@ canvas.addEventListener('pointerdown', e => {
     lastPointers.push(e);
     const pt = toCanvas(e.clientX, e.clientY);
     if (e.button === 2 || lastPointers.length > 1) { isPanning = true; currentPath = null; return; }
-    if (mode === 'window') { windowStart = pt; return; }
+    if (mode === 'window') { windowStart = pt; windowRect = null; return; }
     if (pt.x < 0 || pt.x > currentSize.w || pt.y < 0 || pt.y > currentSize.h) return;
     if (mode.startsWith('stamp')) { allPaths.push({type: mode, x: pt.x, y: pt.y, color: currentColor}); }
     else if (mode === 'draw') currentPath = {points: [pt], color: currentColor};
@@ -437,19 +421,41 @@ function resetView() {
 
 function undo() { if(allPaths.length > 0) { allPaths.pop(); render(); } }
 
+function exportImageWithWindow() {
+    if (!windowRect) { alert("先に「印刷窓」ツールで範囲を指定してください。"); return; }
+    
+    // 画面上の位置に変換
+    const screenPos = fromCanvas(windowRect.x, windowRect.y);
+    const screenW = windowRect.w * view.scale;
+    const screenH = windowRect.h * view.scale;
+    const dpr = window.devicePixelRatio || 1;
+
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = screenW * dpr;
+    tempCanvas.height = screenH * dpr;
+    const tCtx = tempCanvas.getContext('2d');
+
+    tCtx.drawImage(canvas, 
+        screenPos.x * dpr, screenPos.y * dpr, screenW * dpr, screenH * dpr,
+        0, 0, screenW * dpr, screenH * dpr
+    );
+
+    const a = document.createElement('a');
+    a.href = tempCanvas.toDataURL("image/png");
+    a.download = `${projectName}_output.png`;
+    a.click();
+}
+
 function importProjectJSON(i) {
     const r = new FileReader();
     r.onload = e => {
         try {
             const d = JSON.parse(e.target.result); 
-            allPaths = d.paths || [];
-            projectName = d.projectName || "復元プロジェクト";
-            currentSize = d.currentSize || SIZES.A3_LANDSCAPE; // サイズ復元
-            mapImage = new Image(); 
-            mapImage.onload = () => { resetView(); render(); }; 
-            mapImage.src = d.map || "";
+            allPaths = d.paths || []; projectName = d.projectName || "復元";
+            currentSize = d.currentSize || SIZES.A3_LANDSCAPE;
+            mapImage = new Image(); mapImage.onload = () => { resetView(); render(); }; mapImage.src = d.map || "";
             document.getElementById('start-overlay').style.display = 'none';
-        } catch(err) { alert("ファイルの読み込みに失敗しました。"); }
+        } catch(err) { alert("失敗"); }
     };
     if(i.files[0]) r.readAsText(i.files[0]);
 }
