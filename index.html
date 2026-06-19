@@ -682,7 +682,19 @@ window.addEventListener('pointermove', e => {
         // ✅ FIX: 消去はドラッグ中も逐次処理
         eraseAt(pt);
     } else if (currentPath) {
-        currentPath.points.push(pt);
+        // ✅ FIX: キャンバス外へのはみ出し描画を防止（範囲内にクランプ)
+        const clamped = {
+            x: Math.max(0, Math.min(currentSize.w, pt.x)),
+            y: Math.max(0, Math.min(currentSize.h, pt.y))
+        };
+        // 手振れ補正: 指数移動平均（EMA）による平滑化（固定強度）
+        const SMOOTH_ALPHA = 0.35;
+        const last = currentPath.points[currentPath.points.length - 1];
+        const smoothed = last ? {
+            x: last.x + SMOOTH_ALPHA * (clamped.x - last.x),
+            y: last.y + SMOOTH_ALPHA * (clamped.y - last.y)
+        } : clamped;
+        currentPath.points.push(smoothed);
     }
     render();
 });
