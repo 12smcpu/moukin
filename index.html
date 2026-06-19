@@ -62,15 +62,18 @@
         button { 
             padding: 10px 8px; cursor: pointer; border: 1px solid var(--border); 
             background: #fff; border-radius: 8px; font-size: 12px; font-weight: 500;
-            color: var(--text); transition: all 0.2s;
+            color: var(--text); transition: transform 0.1s ease, background 0.2s, border-color 0.2s, box-shadow 0.2s;
             display: flex; align-items: center; justify-content: center; gap: 4px;
             white-space: nowrap; overflow: hidden;
+            touch-action: manipulation; -webkit-tap-highlight-color: transparent;
         }
         button:hover { background: #f8fafc; border-color: #cbd5e1; }
+        button:active { transform: scale(0.92); }
         button.active { background: var(--accent); color: white; border-color: var(--accent); box-shadow: 0 4px 10px rgba(37, 99, 235, 0.2); }
+        button.active:active, button.active-geo:active { transform: scale(0.92); }
         button.active-geo { background: var(--accent-geo); color: white; border-color: var(--accent-geo); box-shadow: 0 4px 10px rgba(5, 150, 105, 0.2); }
-        #colorPicker { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 0; }
-        .color-btn { width: 26px; height: 26px; border-radius: 8px; border: 2px solid transparent; cursor: pointer; transition: transform 0.2s; }
+        #colorPicker { display: flex; flex-wrap: nowrap; gap: 5px; padding: 4px 0; }
+        .color-btn { width: 22px; height: 22px; border-radius: 6px; border: 2px solid transparent; cursor: pointer; transition: transform 0.2s; flex-shrink: 0; }
         .color-btn.selected { transform: scale(1.2); border-color: #fff; box-shadow: 0 0 0 2px var(--accent); }
         canvas { display: block; cursor: crosshair; }
         .file-label { font-size: 11px; background: #f1f5f9; padding: 8px; border-radius: 8px; border: 1px dashed #cbd5e1; text-align: center; cursor: pointer; }
@@ -217,6 +220,7 @@
         </div>
         <div class="btn-group">
             <button id="btn-window" onclick="setMode('window')">🖼️ 印刷窓</button>
+            <button id="btn-overlay-toggle" onclick="toggleOverlayVisible()" title="枠の表示/非表示">👁</button>
             <button onclick="undo()">↩️ 戻る</button>
         </div>
     </div>
@@ -224,9 +228,15 @@
     <div class="section">
         <div class="section-title">Analysis Stamps</div>
         <div class="btn-group triple">
-            <button id="btn-s1" onclick="setMode('stamp-circle')">〇</button>
-            <button id="btn-s2" onclick="setMode('stamp-dot')">●</button>
-            <button id="btn-s3" onclick="setMode('stamp-double')">◎</button>
+            <button id="btn-s1" onclick="setMode('stamp-circle')" title="単円スタンプ">
+                <svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+            </button>
+            <button id="btn-s2" onclick="setMode('stamp-dot')" title="ドットスタンプ">
+                <svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="currentColor"/></svg>
+            </button>
+            <button id="btn-s3" onclick="setMode('stamp-double')" title="二重円スタンプ">
+                <svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="8" r="3.2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+            </button>
         </div>
     </div>
 
@@ -275,7 +285,7 @@ const SIZES = {
     A3_LANDSCAPE: { w: 1587, h: 1123 },
     A4_PORTRAIT:  { w: 842,  h: 1191 }
 };
-const STAMP_RADIUS = 7; // スタンプ半径を一元管理
+const STAMP_RADIUS = 3.5; // スタンプ半径を一元管理
 
 const canvas = document.getElementById('viewport');
 const ctx    = canvas.getContext('2d');
@@ -289,7 +299,10 @@ let currentColor = '#ef4444';
 let view         = { x: 0, y: 0, scale: 0.5 };
 let lastPointers = [];
 let isPanning    = false;
-let windowRect   = null;  // 印刷窓
+let windowRect      = null;   // 印刷窓
+let isDirty         = false;  // 未保存の変更フラグ
+let windowVisible   = true;   // 印刷窓の表示フラグ
+let georefVisible   = true;   // 座標範囲枠の表示フラグ
 let windowStart  = null;
 let projectName  = '';
 let currentMousePos = null;
@@ -358,6 +371,7 @@ function exportProjectJSON() {
     a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: 'application/json' }));
     a.download = `${projectName}_${getFormattedDate()}.json`;
     a.click();
+    isDirty = false;  // 保存完了
 }
 
 function importProjectJSON(input) {
@@ -580,8 +594,8 @@ function render() {
         ctx.globalAlpha = 1.0;
     }
 
-    // 印刷窓
-    if (windowRect) {
+    // 印刷窓（非表示フラグ時はスキップ）
+    if (windowRect && windowVisible) {
         ctx.save();
         ctx.strokeStyle = 'rgba(37, 99, 235, 0.8)';
         ctx.lineWidth   = 2 / view.scale;
@@ -608,8 +622,8 @@ function render() {
         ctx.restore();
     }
 
-    // 確定済み座標範囲（常時表示）
-    if (geoRef) {
+    // 確定済み座標範囲（非表示フラグ時はスキップ）
+    if (geoRef && georefVisible) {
         const r = geoRef.pixelRect;
         ctx.save();
         ctx.strokeStyle = 'rgba(5, 150, 105, 0.5)';
@@ -703,7 +717,7 @@ canvas.addEventListener('pointerdown', e => {
     if (pt.x < 0 || pt.x > currentSize.w || pt.y < 0 || pt.y > currentSize.h) return;
 
     if (mode.startsWith('stamp')) {
-        allPaths.push({ type: mode, x: pt.x, y: pt.y, color: currentColor });
+        allPaths.push({ type: mode, x: pt.x, y: pt.y, color: currentColor }); isDirty = true;
     } else if (mode === 'draw' || mode === 'arrow') {
         currentPath = { type: mode, points: [pt], color: currentColor };
     } else if (mode === 'erase') {
@@ -732,7 +746,7 @@ window.addEventListener('pointerup', e => {
         georefStart = null;
 
         if (currentPath && !currentPath._erase) {
-            allPaths.push(currentPath);
+            allPaths.push(currentPath); isDirty = true;
         }
         currentPath = null;
     }
@@ -751,6 +765,24 @@ canvas.addEventListener('wheel', e => {
 // ============================================================
 //  UI
 // ============================================================
+// ── 離脱警告 ──
+window.addEventListener('beforeunload', (e) => {
+    if (isDirty) {
+        e.preventDefault();
+        e.returnValue = '保存されていない変更があります。ページを離れますか？';
+    }
+});
+
+// 印刷窓・座標範囲枠を連動して表示/非表示トグル
+function toggleOverlayVisible() {
+    windowVisible = !windowVisible;
+    georefVisible = windowVisible;  // 連動
+    const btn = document.getElementById('btn-overlay-toggle');
+    btn.style.opacity = windowVisible ? '1' : '0.35';
+    btn.title = windowVisible ? '枠を非表示にする' : '枠を表示する';
+    redraw();
+}
+
 function toggleToolbar() {
     const tb  = document.getElementById('toolbar');
     const btn = document.getElementById('toggle-btn');
@@ -985,8 +1017,12 @@ function exportSVG() {
     const parts = [];
 
     // 1. SVGルート + defs
+    // Illustratorが向きを正しく解釈できるよう width/heightにpx単位を明示し
+    // x="0" y="0" を追加。横倒し防止のため viewBox の w/h をキャンバスサイズと一致させる
     parts.push(`<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
-  width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`);
+  x="0px" y="0px"
+  width="${W}px" height="${H}px" viewBox="0 0 ${W} ${H}"
+  xml:space="preserve">`);
 
     // 2. metadata：地理座標キャリブレーション情報を保持
     parts.push(`  <metadata>`);
@@ -1026,15 +1062,21 @@ function exportSVG() {
         parts.push(`  <desc>RAPTOR_GEOREF:${georefJson}:END_RAPTOR_GEOREF</desc>`);
     }
 
-    // 3. defs：矢印マーカー定義（色ごとに生成）
+    // 3. defs：矢印マーカー定義（Illustrator互換形式）
+    // marker-end="url(#...)" をIllustratorが線端スタイルとして認識するよう
+    // viewBox・markerUnits・orient を正確に指定する
     const arrowColors = [...new Set(
         allPaths.filter(i => i.type === 'arrow').map(i => i.color)
     )];
     parts.push(`  <defs>`);
     arrowColors.forEach(color => {
         const id = 'arrow-' + color.replace('#','');
-        parts.push(`    <marker id="${id}" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">`);
-        parts.push(`      <path d="M0,0 L0,6 L8,3 z" fill="${esc(color)}"/>`);
+        parts.push(`    <marker id="${id}"`);
+        parts.push(`      viewBox="0 0 10 10" refX="9" refY="5"`);
+        parts.push(`      markerUnits="strokeWidth"`);
+        parts.push(`      markerWidth="5" markerHeight="5"`);
+        parts.push(`      orient="auto">`);
+        parts.push(`      <path d="M 0 0 L 10 5 L 0 10 z" fill="${esc(color)}"/>`);
         parts.push(`    </marker>`);
     });
     parts.push(`  </defs>`);
@@ -1057,11 +1099,10 @@ function exportSVG() {
     }
 
     // 6. 描画データをレイヤーグループに分けて出力
-    //    Survey_Notes / Arrows / Stamps の3グループ
+    //    Arrows / Stamps の2グループのみ（メモ・手書き線は除外）
     const groups = {
-        'Survey_Notes': allPaths.filter(i => i.type === 'draw'),
-        'Arrows':        allPaths.filter(i => i.type === 'arrow'),
-        'Stamps':        allPaths.filter(i => i.type && i.type.startsWith('stamp')),
+        'Arrows': allPaths.filter(i => i.type === 'arrow'),
+        'Stamps': allPaths.filter(i => i.type && i.type.startsWith('stamp')),
     };
 
     Object.entries(groups).forEach(([layerName, items]) => {
@@ -1069,25 +1110,19 @@ function exportSVG() {
         parts.push(`  <g id="${layerName}" inkscape:label="${layerName}" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape">`);
 
         items.forEach(item => {
-            if (item.type === 'draw' && item.points && item.points.length > 1) {
-                parts.push(`    <path d="${pointsToD(item.points)}"`);
-                parts.push(`      fill="none" stroke="${esc(item.color)}" stroke-width="1"`);
-                parts.push(`      stroke-linecap="round" stroke-linejoin="round"/>`);
-
-            } else if (item.type === 'arrow' && item.points && item.points.length >= 2) {
-                // 矢印を「線本体」+「三角形ポリゴン」に分離して出力
-                // marker-end方式はIllustratorが線を空にしてしまうため使用しない
-                const pts   = item.points;
-                const last  = pts[pts.length - 1];
-                const prev  = pts[pts.length - 2];
-                const angle = Math.atan2(last.y - prev.y, last.x - prev.x);
+            if (item.type === 'arrow' && item.points && item.points.length >= 2) {
+                // 線＋三角形ポリゴン分離方式
+                // marker-end方式はIllustratorが線を空にするため使用しない
+                const pts     = item.points;
+                const last    = pts[pts.length - 1];
+                const prev    = pts[pts.length - 2];
+                const angle   = Math.atan2(last.y - prev.y, last.x - prev.x);
                 const headLen = 10;
                 const headW   = 5;
-                // 線の終端を矢印付け根まで短縮
-                const trimX = last.x - Math.cos(angle) * headLen;
-                const trimY = last.y - Math.sin(angle) * headLen;
+                const trimX   = last.x - Math.cos(angle) * headLen;
+                const trimY   = last.y - Math.sin(angle) * headLen;
                 const trimPts = [...pts.slice(0, -1), { x: trimX, y: trimY }];
-                // ① 線本体（data-raptor属性でスクリプトから識別可能）
+                // ① 線本体
                 parts.push(`    <path data-raptor="arrow-line" d="${pointsToD(trimPts)}"`);
                 parts.push(`      fill="none" stroke="${esc(item.color)}" stroke-width="2"`);
                 parts.push(`      stroke-linecap="round" stroke-linejoin="round"/>`);
