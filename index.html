@@ -3,7 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>猛禽類調査野帳 </title>
+    <title>猛禽類調査野帳 V5</title>
+
+    <!-- PWA: ホーム画面追加・オフライン対応 -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-180.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="猛禽野帳">
+    <meta name="theme-color" content="#e9e4d8">
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').catch((err) => {
+                    console.warn('Service Worker登録に失敗しました:', err);
+                });
+            });
+        }
+    </script>
     <style>
         :root { 
             --accent: #2563eb; 
