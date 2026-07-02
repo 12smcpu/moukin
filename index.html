@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>猛禽類調査野帳 V5</title>
+    <title>猛禽類調査野帳</title>
 
     <!-- PWA: ホーム画面追加・オフライン対応 -->
     <link rel="manifest" href="manifest.json">
@@ -315,6 +315,7 @@ let mode         = 'draw';
 let currentColor = '#ef4444';
 let view         = { x: 0, y: 0, scale: 0.5 };
 let lastPointers = [];
+let pendingStamp = null; // スタンプ配置の遅延確認用（ピンチ誤爆防止）
 let isPanning    = false;
 let windowRect      = null;   // 印刷窓
 let isDirty         = false;  // 未保存の変更フラグ
@@ -563,8 +564,15 @@ function renderOnCtx(targetCtx, w, h) {
             targetCtx.stroke();
 
             if (item.type === 'arrow' && item.points.length >= 2) {
-                const p2    = item.points[item.points.length - 1];
-                const p1    = item.points[item.points.length - 2];
+                const p2 = item.points[item.points.length - 1];
+                // ✅ FIX: 直近2点だけだと描き終わりの微小なブレで向きが不安定になるため、
+                // 一定距離以上離れた点まで遡って方向を安定させる
+                const MIN_DIST = 8;
+                let refIdx = item.points.length - 2;
+                while (refIdx > 0 && Math.hypot(p2.x - item.points[refIdx].x, p2.y - item.points[refIdx].y) < MIN_DIST) {
+                    refIdx--;
+                }
+                const p1    = item.points[refIdx];
                 const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
                 const head  = 15;
                 targetCtx.beginPath();
@@ -732,6 +740,11 @@ canvas.addEventListener('pointerdown', e => {
     const pt = toCanvas(e.clientX, e.clientY);
 
     if (e.button === 2 || lastPointers.length > 1) {
+        // ✅ FIX: 2本目の指が来たら保留中のスタンプ配置をキャンセル
+        if (pendingStamp) {
+            clearTimeout(pendingStamp.timer);
+            pendingStamp = null;
+        }
         isPanning = true; currentPath = null; return;
     }
 
@@ -746,7 +759,19 @@ canvas.addEventListener('pointerdown', e => {
     if (pt.x < 0 || pt.x > currentSize.w || pt.y < 0 || pt.y > currentSize.h) return;
 
     if (mode.startsWith('stamp')) {
-        allPaths.push({ type: mode, x: pt.x, y: pt.y, color: currentColor }); isDirty = true;
+        // ✅ FIX: ピンチ操作の1本目の指で誤配置されないよう、短時間2本目指の有無を確認
+        const pendingPointerId = e.pointerId;
+        const pendingMode = mode;
+        pendingStamp = { pointerId: pendingPointerId };
+        pendingStamp.timer = setTimeout(() => {
+            // タイマー発火時点でまだ1本指かつモードが変わっていなければ確定
+            if (pendingStamp && pendingStamp.pointerId === pendingPointerId && lastPointers.length <= 1) {
+                allPaths.push({ type: pendingMode, x: pt.x, y: pt.y, color: currentColor });
+                isDirty = true;
+                render();
+            }
+            pendingStamp = null;
+        }, 50);
     } else if (mode === 'draw' || mode === 'arrow') {
         currentPath = { type: mode, points: [pt], color: currentColor };
     } else if (mode === 'erase') {
@@ -757,8 +782,15 @@ canvas.addEventListener('pointerdown', e => {
     render();
 });
 
-window.addEventListener('pointerup', e => {
+function releasePointer(e, { commit }) {
     lastPointers = lastPointers.filter(p => p.pointerId !== e.pointerId);
+
+    // ✅ FIX: 保留中のスタンプがあれば、対象ポインターの解放時にキャンセル
+    if (pendingStamp && pendingStamp.pointerId === e.pointerId) {
+        clearTimeout(pendingStamp.timer);
+        pendingStamp = null;
+    }
+
     if (lastPointers.length === 0) {
         isPanning   = false;
         windowStart = null;
@@ -774,13 +806,21 @@ window.addEventListener('pointerup', e => {
         }
         georefStart = null;
 
-        if (currentPath && !currentPath._erase) {
+        // commit=false（pointercancel時）は描画中の線を確定せず破棄する
+        if (commit && currentPath && !currentPath._erase) {
             allPaths.push(currentPath); isDirty = true;
         }
         currentPath = null;
     }
     render();
-});
+}
+
+window.addEventListener('pointerup', e => releasePointer(e, { commit: true }));
+
+// ✅ FIX: OS側にジェスチャーを横取りされた際に発火する pointercancel に対応。
+// これを無視すると lastPointers に指の情報が残り続け、以後ピンチ/描画が
+// 効かなくなる（2本指状態のまま固定される）不具合の原因になっていた。
+window.addEventListener('pointercancel', e => releasePointer(e, { commit: false }));
 
 canvas.addEventListener('wheel', e => {
     e.preventDefault();
