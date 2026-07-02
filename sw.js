@@ -1,7 +1,7 @@
 // 猛禽類調査野帳 - Service Worker
 // 初回アクセス時にアプリ一式をキャッシュし、以降オフラインでも起動・動作できるようにする
 
-const CACHE_NAME = 'moukin-yacho-v4'; // ← 更新時はこの数字を上げてください（v1→v2）
+const CACHE_NAME = 'moukin-yacho-v5'; // ← 更新時はこの数字を上げてください（v1→v2）
 const ASSETS = [
   './',
   './index.html',
