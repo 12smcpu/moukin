@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>猛禽類調査野帳 V5</title>
+    <title>猛禽類調査野帳</title>
 
     <!-- PWA: ホーム画面追加・オフライン対応 -->
     <link rel="manifest" href="manifest.json">
@@ -160,28 +160,141 @@
         /* エクスポートボタンを縦並びに整列 */
         .export-stack { display: flex; flex-direction: column; gap: 6px; }
         .export-stack button { width: 100%; justify-content: flex-start; padding: 10px 12px; }
+
+        /* ── 画面切替 ── */
+        .app-screen { display: none; width: 100vw; height: 100vh; position: absolute; top:0; left:0; }
+        .app-screen.active { display: flex; }
+
+        /* ライブラリ画面 */
+        #screen-library { flex-direction: row; background: #f8fafc; overflow: hidden; }
+        #lib-sidebar {
+            width: 270px; min-width: 270px; background: #fff;
+            border-right: 1px solid var(--border);
+            display: flex; flex-direction: column; height: 100%;
+            box-shadow: 2px 0 8px rgba(0,0,0,0.04);
+        }
+        #lib-sidebar-header {
+            padding: 16px 14px 12px; border-bottom: 1px solid var(--border);
+            background: #f8fafc; display: flex; align-items: center; justify-content: space-between;
+        }
+        #lib-sidebar-header .logo { display: flex; align-items: center; gap: 8px; }
+        #lib-sidebar-header h1 { font-size: 13px; font-weight: 700; color: var(--text); }
+        .ver-badge { font-size: 10px; background: #e2e8f0; color: #64748b; font-weight: 700; padding: 2px 7px; border-radius: 10px; }
+        #lib-sidebar-actions { padding: 10px; border-bottom: 1px solid var(--border); display: flex; gap: 5px; }
+        #lib-sidebar-actions button { flex: 1; padding: 8px 5px; font-size: 11px; font-weight: 600; border-radius: 8px; cursor: pointer; border: 1px solid; display: flex; align-items: center; justify-content: center; gap: 3px; touch-action: manipulation; }
+        #btn-new-project { background: var(--accent); color: #fff; border-color: var(--accent); }
+        #btn-import-project { background: #f1f5f9; color: #475569; border-color: var(--border); }
+        #project-list { flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 5px; }
+        .proj-item { padding: 10px 11px; border-radius: 9px; cursor: pointer; border: 1px solid var(--border); background: #fff; transition: all 0.15s; }
+        .proj-item:hover { background: #f8fafc; border-color: #cbd5e1; }
+        .proj-item.selected { background: #eff6ff; border-color: #93c5fd; }
+        .proj-item-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 4px; }
+        .proj-item-title { font-size: 12px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; color: var(--text); }
+        .proj-item-del { font-size: 11px; color: #94a3b8; background: none; border: none; cursor: pointer; padding: 0 2px; line-height: 1; flex-shrink: 0; }
+        .proj-item-del:hover { color: #ef4444; }
+        .proj-item-meta { font-size: 10px; color: #94a3b8; margin-top: 2px; }
+        #lib-sidebar-footer { padding: 8px 12px; border-top: 1px solid var(--border); background: #f8fafc; font-size: 10px; color: #94a3b8; display: flex; justify-content: space-between; }
+        #storage-status { color: #059669; font-weight: 700; }
+        #lib-main { flex: 1; padding: 22px; overflow-y: auto; display: flex; flex-direction: column; gap: 18px; }
+        #lib-main-header { border-bottom: 1px solid var(--border); padding-bottom: 14px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 10px; }
+        #lib-project-badge { font-size: 10px; font-weight: 700; color: var(--accent); background: #eff6ff; padding: 2px 9px; border-radius: 10px; border: 1px solid #bfdbfe; display: inline-block; margin-bottom: 4px; }
+        #lib-project-title { font-size: 20px; font-weight: 700; color: var(--text); }
+        #lib-project-desc { font-size: 12px; color: #64748b; margin-top: 2px; }
+        #lib-main-actions { display: flex; gap: 5px; flex-wrap: wrap; }
+        #lib-main-actions button { padding: 7px 11px; font-size: 11px; font-weight: 600; border-radius: 8px; border: 1px solid; cursor: pointer; touch-action: manipulation; white-space: nowrap; }
+        #btn-export-proj { background: #fff; color: #475569; border-color: var(--border); }
+        #btn-import-fb { background: #fff; color: #475569; border-color: var(--border); }
+        #btn-new-fb { background: var(--accent-geo); color: #fff; border-color: var(--accent-geo); }
+        #fieldbook-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px,1fr)); gap: 14px; }
+        .fb-card { background: #fff; border: 1px solid var(--border); border-radius: 13px; padding: 15px; cursor: pointer; transition: all 0.15s; box-shadow: 0 1px 4px rgba(0,0,0,0.04); display: flex; flex-direction: column; gap: 7px; }
+        .fb-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.1); border-color: #93c5fd; transform: translateY(-1px); }
+        .fb-card-title { font-size: 13px; font-weight: 700; color: var(--text); }
+        .fb-card-meta { font-size: 11px; color: #94a3b8; }
+        .fb-card-actions { display: flex; gap: 5px; margin-top: 3px; }
+        .fb-card-actions button { padding: 6px 9px; font-size: 10px; font-weight: 600; border-radius: 6px; border: 1px solid var(--border); background: #f8fafc; color: #475569; cursor: pointer; touch-action: manipulation; }
+        .fb-btn-open { background: var(--accent) !important; color: #fff !important; border-color: var(--accent) !important; flex: 1; }
+        .fb-btn-del { color: #ef4444 !important; }
+        .empty-state { text-align: center; padding: 40px 20px; color: #94a3b8; font-size: 13px; line-height: 1.7; }
+        .empty-icon { font-size: 32px; margin-bottom: 8px; }
+
+        /* キャンバス画面 */
+        #screen-canvas { flex-direction: column; }
+        #back-btn {
+            position: fixed; top: 12px; left: 12px; z-index: 1003;
+            background: rgba(15,23,42,0.82); color: #fff; backdrop-filter: blur(8px);
+            padding: 7px 12px; border-radius: 9px; font-size: 11px; font-weight: 600;
+            border: 1px solid rgba(255,255,255,0.15); cursor: pointer; touch-action: manipulation;
+            display: flex; align-items: center; gap: 4px; white-space: nowrap;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        #fb-info-bar { font-size: 10px; background: #f8fafc; border: 1px solid var(--border); border-radius: 7px; padding: 5px 9px; color: #475569; line-height: 1.4; }
+        #fb-info-bar strong { color: var(--text); display: block; }
+
+        /* モーダル共通 */
+        .modal-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(15,23,42,0.85); backdrop-filter: blur(6px); z-index: 8000; display: none; align-items: center; justify-content: center; }
+        .modal-overlay.open { display: flex; }
+        .modal-card { background: white; padding: 24px; border-radius: 18px; width: 92%; max-width: 420px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); display: flex; flex-direction: column; gap: 13px; }
+        .modal-card h3 { font-size: 15px; font-weight: 700; color: var(--text); margin: 0; }
+        .modal-card p { font-size: 12px; color: #64748b; line-height: 1.5; margin: 0; }
+        .modal-card input[type="text"], .modal-card input[type="number"], .modal-card textarea { width: 100%; padding: 9px 11px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 13px; outline: none; transition: border-color 0.2s; font-family: inherit; }
+        .modal-card input:focus, .modal-card textarea:focus { border-color: var(--accent); }
+        .modal-card input.error { border-color: #ef4444; background: #fff5f5; }
+        .modal-card textarea { resize: none; height: 68px; }
+        .modal-row { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+        .modal-row label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #475569; }
+        .modal-btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+        .modal-btn-row button { padding: 10px; font-size: 12px; font-weight: 600; border-radius: 9px; }
+        .btn-confirm { background: var(--accent-geo) !important; color: white !important; border-color: var(--accent-geo) !important; }
+        .btn-confirm-blue { background: var(--accent) !important; color: white !important; border-color: var(--accent) !important; }
+        .btn-cancel-gray { background: #f1f5f9 !important; color: #64748b !important; border-color: var(--border) !important; }
+        .size-selector { background: #f8fafc; padding: 9px 11px; border-radius: 8px; border: 1px solid var(--border); }
+        .size-selector p { font-size: 11px; font-weight: 700; color: #64748b; margin: 0 0 7px; }
+        .size-selector label { display: block; margin: 5px 0; cursor: pointer; font-size: 12px; color: var(--text); }
+
+        /* トースト */
+        #toast { position: fixed; bottom: 18px; right: 18px; z-index: 9999; background: #0f172a; color: white; padding: 8px 15px; border-radius: 9px; font-size: 12px; font-weight: 500; box-shadow: 0 8px 20px rgba(0,0,0,0.2); opacity: 0; transform: translateY(8px); transition: all 0.25s; pointer-events: none; }
+        #toast.show { opacity: 1; transform: translateY(0); }
     </style>
 </head>
 <body>
 
-<!-- ===== 起動オーバーレイ ===== -->
-<div id="start-overlay">
-    <div class="start-card">
-        <h2>調査開始</h2>
-        <p style="color:#64748b;font-size:14px;">新規プロジェクト名を入力</p>
-        <input type="text" id="project-name-input" placeholder="例: 〇〇地区 猛禽類調査">
-        <div class="size-selector">
-            <p style="margin:0 0 8px;font-weight:bold;font-size:12px;color:#64748b;">用紙サイズを選択</p>
-            <label><input type="radio" name="paper-size" value="A3_LANDSCAPE" checked> A3横 (420×297mm)</label>
-            <label><input type="radio" name="paper-size" value="A4_PORTRAIT"> A4縦 (210×297mm)</label>
+<!-- ライブラリ画面 -->
+<div id="screen-library" class="app-screen active">
+    <aside id="lib-sidebar">
+        <div id="lib-sidebar-header">
+            <div class="logo"><span style="font-size:20px;">🦅</span><h1>猛禽類調査野帳</h1></div>
+            <span class="ver-badge">V6</span>
         </div>
-        <button onclick="startProject()">新規開始</button>
-        <div style="margin:15px 0;border-top:1px solid #e2e8f0;padding-top:15px;">
-            <p style="color:#64748b;font-size:14px;">または既存ファイルから再開</p>
-            <button onclick="document.getElementById('importFile').click()" style="background:#64748b;color:white;">ファイルを選択</button>
+        <div id="lib-sidebar-actions">
+            <button id="btn-new-project" onclick="openNewProjectModal()">＋ 新規業務</button>
+            <button id="btn-import-project" onclick="document.getElementById('importProjFile').click()" title="JSONを開く">📂 開く</button>
+            <input type="file" id="importProjFile" accept=".json" style="display:none" onchange="importProjectJSONFile(this)">
         </div>
-    </div>
+        <div id="project-list"></div>
+        <div id="lib-sidebar-footer"><span>保存: IndexedDB</span><span id="storage-status">● 正常</span></div>
+    </aside>
+    <main id="lib-main">
+        <div id="lib-main-header">
+            <div>
+                <div id="lib-project-badge">選択中のプロジェクト</div>
+                <div id="lib-project-title">プロジェクトを選択してください</div>
+                <div id="lib-project-desc">左のメニューからプロジェクトを選択するか、新規作成してください。</div>
+            </div>
+            <div id="lib-main-actions" style="display:none;">
+                <button id="btn-export-proj" onclick="exportCurrentProjectJSON()">💾 JSON出力</button>
+                <button id="btn-import-fb" onclick="document.getElementById('importFbFile').click()">📥 野帳追加</button>
+                <input type="file" id="importFbFile" accept=".json" style="display:none" onchange="importFieldbookJSONFile(this)">
+                <button id="btn-new-fb" onclick="openNewFieldbookModal()">📝 野帳を1枚追加</button>
+            </div>
+        </div>
+        <div id="fieldbook-grid"></div>
+    </main>
 </div>
+
+<!-- キャンバス画面 -->
+<div id="screen-canvas" class="app-screen">
+<button id="back-btn" onclick="openLibraryScreen()">← 一覧に戻る</button>
+
 
 <!-- ===== 座標入力モーダル ===== -->
 <div id="geo-modal">
@@ -213,12 +326,13 @@
 
 <div id="toolbar">
     <div class="section">
-        <div class="section-title">Project</div>
+        <div class="section-title">Fieldbook</div>
+        <div id="fb-info-bar">野帳を開いてください</div>
         <div class="btn-group">
-            <button onclick="exportProjectJSON()">💾 保存</button>
-            <button onclick="document.getElementById('importFile').click()">📂 開く</button>
+            <button onclick="exportActiveFieldbookJSON()">💾 野帳保存</button>
+            <button onclick="document.getElementById('importActiveFbFile').click()">📂 上書き読込</button>
         </div>
-        <input type="file" id="importFile" accept=".json" style="display:none" onchange="importProjectJSON(this)">
+        <input type="file" id="importActiveFbFile" accept=".json" style="display:none" onchange="importActiveFieldbookFile(this)">
     </div>
 
     <div class="section">
@@ -293,8 +407,325 @@
 </div>
 
 <canvas id="viewport"></canvas>
+</div><!-- /screen-canvas -->
 
 <script>
+
+// ============================================================
+//  IndexedDB
+// ============================================================
+const DB_NAME    = 'RaptorSurveyDB';
+const DB_VERSION = 1;
+const DB_STORE   = 'app_data';
+
+function openDatabase() {
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
+        req.onupgradeneeded = e => {
+            if (!e.target.result.objectStoreNames.contains(DB_STORE))
+                e.target.result.createObjectStore(DB_STORE);
+        };
+        req.onsuccess = e => resolve(e.target.result);
+        req.onerror   = e => reject(e.target.error);
+    });
+}
+
+async function loadDatabase() {
+    try {
+        const db = await openDatabase();
+        return new Promise(resolve => {
+            const req = db.transaction(DB_STORE,'readonly').objectStore(DB_STORE).get('root');
+            req.onsuccess = () => resolve(req.result || { projects:[] });
+            req.onerror   = () => resolve({ projects:[] });
+        });
+    } catch(e) { return { projects:[] }; }
+}
+
+async function saveDatabase(data) {
+    appData = data || appData;
+    try {
+        const db = await openDatabase();
+        return new Promise(resolve => {
+            const req = db.transaction(DB_STORE,'readwrite').objectStore(DB_STORE).put(appData,'root');
+            req.onsuccess = () => { showToast('💾 自動保存完了'); resolve(true); };
+            req.onerror   = () => resolve(false);
+        });
+    } catch(e) { return false; }
+}
+
+// ============================================================
+//  アプリ状態（DB管理）
+// ============================================================
+let appData           = { projects:[] };
+let activeProjectId   = null;
+let activeFieldbookId = null;
+
+function getFormattedDate() {
+    const n = new Date();
+    return `${n.getFullYear()}${String(n.getMonth()+1).padStart(2,'0')}${String(n.getDate()).padStart(2,'0')}`;
+}
+
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ============================================================
+//  画面遷移
+// ============================================================
+function openLibraryScreen() {
+    autoSaveCurrentFieldbook();
+    document.getElementById('screen-canvas').classList.remove('active');
+    document.getElementById('screen-library').classList.add('active');
+    renderLibraryUI();
+}
+
+async function openCanvasScreen(projId, fbId) {
+    activeProjectId   = projId;
+    activeFieldbookId = fbId;
+    const p  = appData.projects.find(p => p.id === projId);
+    const fb = p?.fieldbooks.find(f => f.id === fbId);
+    if (!p || !fb) return;
+    currentSize = SIZES[fb.currentSizeKey] || SIZES.A3_LANDSCAPE;
+    allPaths    = (fb.paths || []).map(p => ({...p}));
+    windowRect  = fb.windowRect ? {...fb.windowRect} : null;
+    geoRef      = fb.geoRef     ? {...fb.geoRef}     : null;
+    updateGeoStatus();
+    document.getElementById('fb-info-bar').innerHTML = `<strong>${escHtml(fb.title)}</strong><span style="color:#94a3b8;font-size:10px;">${escHtml(p.title)}</span>`;
+    mapImage = new Image();
+    if (fb.map) { mapImage.onload = () => { resetView(); render(); }; mapImage.src = fb.map; }
+    else { mapImage.src=''; resetView(); }
+    document.getElementById('screen-library').classList.remove('active');
+    document.getElementById('screen-canvas').classList.add('active');
+    resize(); setMode('draw');
+}
+
+async function autoSaveCurrentFieldbook() {
+    if (!activeProjectId || !activeFieldbookId) return;
+    const p  = appData.projects.find(p => p.id === activeProjectId);
+    const fb = p?.fieldbooks.find(f => f.id === activeFieldbookId);
+    if (!p || !fb) return;
+    fb.paths      = allPaths;
+    fb.windowRect = windowRect;
+    fb.geoRef     = geoRef;
+    fb.map        = (mapImage?.src) ? mapImage.src : '';
+    fb.updatedAt  = getFormattedDate();
+    p.updatedAt   = getFormattedDate();
+    await saveDatabase();
+}
+
+// ============================================================
+//  ライブラリUI
+// ============================================================
+function renderLibraryUI() {
+    const listEl = document.getElementById('project-list');
+    listEl.innerHTML = '';
+    if (appData.projects.length === 0) {
+        listEl.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div>プロジェクトがありません。<br>「新規業務」から作成してください。</div>';
+    } else {
+        appData.projects.forEach(p => {
+            const el = document.createElement('div');
+            el.className = 'proj-item' + (p.id === activeProjectId ? ' selected' : '');
+            el.onclick = () => selectProject(p.id);
+            el.innerHTML = `<div class="proj-item-header"><span class="proj-item-title">${escHtml(p.title)}</span><button class="proj-item-del" onclick="deleteProject(event,'${p.id}')" title="削除">✕</button></div><div class="proj-item-meta">野帳 ${p.fieldbooks.length}枚 · ${p.updatedAt||''}</div>`;
+            listEl.appendChild(el);
+        });
+    }
+    const p = appData.projects.find(p => p.id === activeProjectId);
+    if (p) {
+        document.getElementById('lib-project-badge').textContent = '選択中のプロジェクト';
+        document.getElementById('lib-project-title').textContent = p.title;
+        document.getElementById('lib-project-desc').textContent  = p.desc || '';
+        document.getElementById('lib-main-actions').style.display = 'flex';
+        renderFieldbookGrid(p);
+    } else {
+        document.getElementById('lib-project-title').textContent = 'プロジェクトを選択してください';
+        document.getElementById('lib-project-desc').textContent  = '左のメニューからプロジェクトを選択するか、新規作成してください。';
+        document.getElementById('lib-main-actions').style.display = 'none';
+        document.getElementById('fieldbook-grid').innerHTML = '';
+    }
+}
+
+function renderFieldbookGrid(project) {
+    const grid = document.getElementById('fieldbook-grid');
+    grid.innerHTML = '';
+    if (!project.fieldbooks.length) {
+        grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">📝</div>野帳がありません。<br>「野帳を1枚追加」で作成してください。</div>';
+        return;
+    }
+    project.fieldbooks.forEach(fb => {
+        const el = document.createElement('div');
+        el.className = 'fb-card';
+        const sizeLabel = fb.currentSizeKey === 'A3_LANDSCAPE' ? 'A3横' : 'A4縦';
+        el.innerHTML = `<div class="fb-card-title">${escHtml(fb.title)}</div><div class="fb-card-meta">${sizeLabel} · 更新: ${fb.updatedAt||'未保存'}</div><div class="fb-card-actions"><button class="fb-btn-open" onclick="openCanvasScreen('${project.id}','${fb.id}')">開く ▶</button><button onclick="exportSingleFieldbookJSON(event,'${project.id}','${fb.id}')">💾</button><button class="fb-btn-del" onclick="deleteFieldbook(event,'${project.id}','${fb.id}')">🗑️</button></div>`;
+        grid.appendChild(el);
+    });
+}
+
+function selectProject(id) { activeProjectId = id; renderLibraryUI(); }
+
+// ============================================================
+//  CRUD
+// ============================================================
+function openNewProjectModal() {
+    document.getElementById('new-proj-title').value = '';
+    document.getElementById('new-proj-desc').value  = '';
+    openModal('modal-project');
+}
+
+async function confirmNewProject() {
+    const title = document.getElementById('new-proj-title').value.trim();
+    if (!title) { alert('プロジェクト名を入力してください'); return; }
+    const proj = { id:'proj_'+Date.now(), title, desc:document.getElementById('new-proj-desc').value.trim(), createdAt:getFormattedDate(), updatedAt:getFormattedDate(), fieldbooks:[] };
+    appData.projects.unshift(proj);
+    activeProjectId = proj.id;
+    await saveDatabase();
+    closeModal('modal-project');
+    renderLibraryUI();
+}
+
+async function deleteProject(e, id) {
+    e.stopPropagation();
+    if (!confirm('このプロジェクトと含まれる全野帳を削除しますか？')) return;
+    appData.projects = appData.projects.filter(p => p.id !== id);
+    if (activeProjectId === id) activeProjectId = null;
+    await saveDatabase(); renderLibraryUI();
+}
+
+function openNewFieldbookModal() {
+    document.getElementById('new-fb-title').value = '';
+    openModal('modal-fieldbook');
+}
+
+async function confirmNewFieldbook() {
+    const title = document.getElementById('new-fb-title').value.trim();
+    if (!title) { alert('野帳のタイトルを入力してください'); return; }
+    const sizeKey = document.querySelector('input[name="fb-paper-size"]:checked').value;
+    const p = appData.projects.find(p => p.id === activeProjectId);
+    if (!p) return;
+    const fb = { id:'fb_'+Date.now(), title, currentSizeKey:sizeKey, map:'', paths:[], windowRect:null, geoRef:null, updatedAt:getFormattedDate() };
+    p.fieldbooks.push(fb); p.updatedAt = getFormattedDate();
+    await saveDatabase(); closeModal('modal-fieldbook');
+    openCanvasScreen(p.id, fb.id);
+}
+
+async function deleteFieldbook(e, projId, fbId) {
+    e.stopPropagation();
+    if (!confirm('この野帳を削除しますか？')) return;
+    const p = appData.projects.find(p => p.id === projId);
+    if (!p) return;
+    p.fieldbooks = p.fieldbooks.filter(f => f.id !== fbId);
+    await saveDatabase(); renderLibraryUI();
+}
+
+// ============================================================
+//  JSON入出力
+// ============================================================
+function exportCurrentProjectJSON() {
+    const p = appData.projects.find(p => p.id === activeProjectId);
+    if (!p) return;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(p,null,2)],{type:'application/json'}));
+    a.download = `プロジェクト_${p.title}_${getFormattedDate()}.json`;
+    a.click();
+}
+
+function exportSingleFieldbookJSON(e, projId, fbId) {
+    if (e) e.stopPropagation();
+    const p  = appData.projects.find(p => p.id === projId);
+    const fb = p?.fieldbooks.find(f => f.id === fbId);
+    if (!fb) return;
+    const data = { type:'raptor_fieldbook_v1', title:fb.title, currentSizeKey:fb.currentSizeKey, map:fb.map||'', paths:fb.paths||[], windowRect:fb.windowRect||null, geoRef:fb.geoRef||null, updatedAt:getFormattedDate() };
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
+    a.download = `野帳_${fb.title}_${getFormattedDate()}.json`;
+    a.click();
+}
+
+function exportActiveFieldbookJSON() {
+    autoSaveCurrentFieldbook();
+    if (activeProjectId && activeFieldbookId) exportSingleFieldbookJSON(null, activeProjectId, activeFieldbookId);
+}
+
+function importProjectJSONFile(input) {
+    const r = new FileReader();
+    r.onload = async e => {
+        try {
+            const data = JSON.parse(e.target.result);
+            if (data.fieldbooks) {
+                // プロジェクト形式
+                data.id = 'proj_'+Date.now();
+                appData.projects.unshift(data);
+                activeProjectId = data.id;
+            } else if (data.paths !== undefined) {
+                // 旧形式（v5以前）マイグレーション
+                const sizeKey = Object.entries(SIZES).find(([k,v]) => v.w === data.currentSize?.w)?.[0] || 'A3_LANDSCAPE';
+                const fb = { id:'fb_'+Date.now(), title:data.projectName||'インポート', currentSizeKey:sizeKey, map:data.map||'', paths:data.paths||[], windowRect:data.windowRect||null, geoRef:data.geoRef||null, updatedAt:getFormattedDate() };
+                const proj = { id:'proj_'+Date.now(), title:data.projectName||'インポート', desc:'（旧形式JSONから移行）', createdAt:getFormattedDate(), updatedAt:getFormattedDate(), fieldbooks:[fb] };
+                appData.projects.unshift(proj);
+                activeProjectId = proj.id;
+                showToast(`✓ 旧形式「${proj.title}」を移行しました`);
+            } else { alert('このJSONはプロジェクト形式ではありません。'); input.value=''; return; }
+            await saveDatabase(); renderLibraryUI();
+        } catch { alert('JSONの読み込みに失敗しました。'); }
+        input.value = '';
+    };
+    if (input.files[0]) r.readAsText(input.files[0]);
+}
+
+function importFieldbookJSONFile(input) {
+    const p = appData.projects.find(p => p.id === activeProjectId);
+    if (!p) { alert('プロジェクトを選択してください。'); return; }
+    const r = new FileReader();
+    r.onload = async e => {
+        try {
+            const data = JSON.parse(e.target.result);
+            if (data.fieldbooks) { alert('これはプロジェクトJSONです。左の「開く」をご利用ください。'); return; }
+            const fb = { id:'fb_'+Date.now(), title:data.title||'インポート野帳', currentSizeKey:data.currentSizeKey||'A3_LANDSCAPE', map:data.map||'', paths:data.paths||[], windowRect:data.windowRect||null, geoRef:data.geoRef||null, updatedAt:getFormattedDate() };
+            p.fieldbooks.push(fb); p.updatedAt = getFormattedDate();
+            await saveDatabase(); renderLibraryUI();
+            showToast(`✓ 野帳「${fb.title}」を追加しました`);
+        } catch { alert('野帳JSONの読み込みに失敗しました。'); }
+        input.value = '';
+    };
+    if (input.files[0]) r.readAsText(input.files[0]);
+}
+
+function importActiveFieldbookFile(input) {
+    const p  = appData.projects.find(p => p.id === activeProjectId);
+    const fb = p?.fieldbooks.find(f => f.id === activeFieldbookId);
+    if (!fb) return;
+    if (!confirm('現在の野帳データを上書きしますか？')) { input.value=''; return; }
+    const r = new FileReader();
+    r.onload = async e => {
+        try {
+            const data = JSON.parse(e.target.result);
+            fb.currentSizeKey = data.currentSizeKey || fb.currentSizeKey;
+            fb.map = data.map || ''; fb.paths = data.paths || [];
+            fb.windowRect = data.windowRect || null; fb.geoRef = data.geoRef || null;
+            fb.updatedAt = getFormattedDate();
+            currentSize = SIZES[fb.currentSizeKey] || SIZES.A3_LANDSCAPE;
+            allPaths = fb.paths; windowRect = fb.windowRect; geoRef = fb.geoRef;
+            mapImage = new Image();
+            if (fb.map) { mapImage.onload = () => { resetView(); render(); }; mapImage.src = fb.map; }
+            else { mapImage.src=''; resetView(); }
+            updateGeoStatus(); await saveDatabase(); render();
+            showToast('✓ 野帳を上書きしました');
+        } catch { alert('読み込みに失敗しました。'); }
+        input.value = '';
+    };
+    if (input.files[0]) r.readAsText(input.files[0]);
+}
+
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
 // ============================================================
 //  定数・状態
 // ============================================================
@@ -341,19 +772,22 @@ let georefRect  = null;   // 確定前の描画用矩形
 // ============================================================
 //  初期化
 // ============================================================
-function init() {
+async function init() {
+    appData = await loadDatabase();
     window.addEventListener('resize', resize);
-    resize();
-    view.x = window.innerWidth / 2;
-    view.y = window.innerHeight / 2;
     createColorButtons();
     canvas.addEventListener('contextmenu', e => e.preventDefault());
     document.getElementById('mapInput').onchange = e => {
         const r = new FileReader();
-        r.onload = f => { mapImage = new Image(); mapImage.onload = resetView; mapImage.src = f.target.result; };
+        r.onload = f => {
+            mapImage = new Image();
+            mapImage.onload = () => { resetView(); render(); autoSaveCurrentFieldbook(); };
+            mapImage.src = f.target.result;
+        };
         if (e.target.files[0]) r.readAsDataURL(e.target.files[0]);
     };
-    setResScale(3); // デフォルト×3
+    setResScale(3);
+    renderLibraryUI();
     render();
 }
 
@@ -375,42 +809,11 @@ function getFormattedDate() {
     return `${n.getFullYear()}${String(n.getMonth()+1).padStart(2,'0')}${String(n.getDate()).padStart(2,'0')}`;
 }
 
-function exportProjectJSON() {
-    const data = {
-        version: 5,
-        projectName,
-        currentSize,
-        map: mapImage.src,
-        paths: allPaths,
-        windowRect,   // 印刷窓も保存
-        geoRef        // 座標設定も保存
-    };
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: 'application/json' }));
-    a.download = `${projectName}_${getFormattedDate()}.json`;
-    a.click();
-    isDirty = false;  // 保存完了
-}
+// (moved to library management)
 
-function importProjectJSON(input) {
-    const r = new FileReader();
-    r.onload = e => {
-        try {
-            const d = JSON.parse(e.target.result);
-            allPaths    = d.paths      || [];
-            projectName = d.projectName || '復元';
-            currentSize = d.currentSize || SIZES.A3_LANDSCAPE;
-            windowRect  = d.windowRect  || null;
-            geoRef      = d.geoRef      || null;
-            updateGeoStatus();
-            mapImage = new Image();
-            mapImage.onload = () => { resetView(); render(); };
-            mapImage.src = d.map || '';
-            document.getElementById('start-overlay').style.display = 'none';
-        } catch { alert('ファイルの読み込みに失敗しました。'); }
-    };
-    if (input.files[0]) r.readAsText(input.files[0]);
-}
+
+// (moved to library management)
+
 
 // ============================================================
 //  座標キャリブレーション
@@ -558,24 +961,32 @@ function renderOnCtx(targetCtx, w, h) {
             targetCtx.lineWidth  = 1;
             targetCtx.lineCap    = 'round';
             targetCtx.lineJoin   = 'round';
-            targetCtx.beginPath();
-            targetCtx.moveTo(item.points[0].x, item.points[0].y);
-            item.points.forEach(p => targetCtx.lineTo(p.x, p.y));
-            targetCtx.stroke();
 
             if (item.type === 'arrow' && item.points.length >= 2) {
-                const p2 = item.points[item.points.length - 1];
-                // 直近2点だけだと描き終わりの微小なブレで向きが不安定になるため、
-                // 一定距離以上離れた点まで遡って方向を安定させる
-                const MIN_DIST = 8;
-                let refIdx = item.points.length - 2;
-                while (refIdx > 0 && Math.hypot(p2.x - item.points[refIdx].x, p2.y - item.points[refIdx].y) < MIN_DIST) {
-                    refIdx--;
+                const pts   = item.points;
+                const p2    = pts[pts.length - 1];
+                const head  = 10;
+                const spread = Math.PI / 9; // ±20°
+
+                // 直近8サンプルの平均ベクトルで方向を安定させる（カーブに強い）
+                const SAMPLES = 8;
+                const start = Math.max(0, pts.length - 1 - SAMPLES);
+                let dx = 0, dy = 0;
+                for (let i = start; i < pts.length - 1; i++) {
+                    dx += pts[i + 1].x - pts[i].x;
+                    dy += pts[i + 1].y - pts[i].y;
                 }
-                const p1    = item.points[refIdx];
-                const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
-                const head  = 10;                  // 長さを2/3に
-                const spread = Math.PI / 9;        // 開き角度 ±20°（より鋭く）
+                const angle = Math.atan2(dy, dx);
+
+                // 線本体をhead分手前で止める（先端はみ出し防止）
+                const trimX = p2.x - Math.cos(angle) * head;
+                const trimY = p2.y - Math.sin(angle) * head;
+                targetCtx.beginPath();
+                targetCtx.moveTo(pts[0].x, pts[0].y);
+                pts.slice(1, -1).forEach(p => targetCtx.lineTo(p.x, p.y));
+                targetCtx.lineTo(trimX, trimY);
+                targetCtx.stroke();
+
                 // 塗りつぶし三角形
                 targetCtx.beginPath();
                 targetCtx.moveTo(p2.x, p2.y);
@@ -780,7 +1191,7 @@ canvas.addEventListener('pointerdown', e => {
             // タイマー発火時点でまだ1本指かつモードが変わっていなければ確定
             if (pendingStamp && pendingStamp.pointerId === pendingPointerId && lastPointers.length <= 1) {
                 allPaths.push({ type: pendingMode, x: pt.x, y: pt.y, color: currentColor });
-                isDirty = true;
+                autoSaveCurrentFieldbook();
                 render();
             }
             pendingStamp = null;
@@ -821,7 +1232,8 @@ function releasePointer(e, { commit }) {
 
         // commit=false（pointercancel時）は描画中の線を確定せず破棄する
         if (commit && currentPath && !currentPath._erase) {
-            allPaths.push(currentPath); isDirty = true;
+            allPaths.push(currentPath);
+            autoSaveCurrentFieldbook();
         }
         currentPath = null;
     }
@@ -848,12 +1260,7 @@ canvas.addEventListener('wheel', e => {
 //  UI
 // ============================================================
 // ── 離脱警告 ──
-window.addEventListener('beforeunload', (e) => {
-    if (isDirty) {
-        e.preventDefault();
-        e.returnValue = '保存されていない変更があります。ページを離れますか？';
-    }
-});
+// 自動保存のため離脱警告は不要
 
 // 印刷窓・座標範囲枠を連動して表示/非表示トグル
 function toggleOverlayVisible() {
@@ -966,7 +1373,7 @@ function exportImageWithWindow() {
 
     const a = document.createElement('a');
     a.href     = expCanvas.toDataURL('image/png');
-    a.download = `${projectName}_${getFormattedDate()}_x${scale}.png`;
+    a.download = `${(appData.projects.find(p=>p.id===activeProjectId)?.fieldbooks.find(f=>f.id===activeFieldbookId)?.title||"野帳")}_${getFormattedDate()}_x${scale}.png`;
     a.click();
 }
 
@@ -1007,7 +1414,7 @@ function exportDXF() {
 
     const a = document.createElement('a');
     a.href     = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'application/dxf' }));
-    a.download = `${projectName}_${getFormattedDate()}.dxf`;
+    a.download = `${(appData.projects.find(p=>p.id===activeProjectId)?.fieldbooks.find(f=>f.id===activeFieldbookId)?.title||"野帳")}_${getFormattedDate()}.dxf`;
     a.click();
 }
 
@@ -1072,7 +1479,7 @@ function exportGeoJSON() {
 
     const a = document.createElement('a');
     a.href     = URL.createObjectURL(new Blob([JSON.stringify(geojson, null, 2)], { type: 'application/json' }));
-    a.download = `${projectName}_${getFormattedDate()}.geojson`;
+    a.download = `${(appData.projects.find(p=>p.id===activeProjectId)?.fieldbooks.find(f=>f.id===activeFieldbookId)?.title||"野帳")}_${getFormattedDate()}.geojson`;
     a.click();
 }
 
@@ -1120,7 +1527,8 @@ function exportSVG() {
     } else {
         parts.push(`      <raptor:calibrated>false</raptor:calibrated>`);
     }
-    parts.push(`      <raptor:project>${esc(projectName)}</raptor:project>`);
+    const _activeFb = appData.projects.find(p=>p.id===activeProjectId)?.fieldbooks.find(f=>f.id===activeFieldbookId);
+    parts.push(`      <raptor:project>${esc(_activeFb?.title||'')}</raptor:project>`);
     parts.push(`      <raptor:canvasSize w="${W}" h="${H}"/>`);
     parts.push(`      <raptor:exportDate>${getFormattedDate()}</raptor:exportDate>`);
     parts.push(`    </raptor:georef>`);
@@ -1249,9 +1657,45 @@ function exportSVG() {
     const geoSuffix = hasGeo
         ? `_NW${geoRef.nwLat}_${geoRef.nwLng}_SE${geoRef.seLat}_${geoRef.seLng}`
         : '';
-    a.download   = `${projectName}${geoSuffix}_${getFormattedDate()}.svg`;
+    a.download   = `${_activeFb?.title||"野帳"}${geoSuffix}_${getFormattedDate()}.svg`;
     a.click();
 }
 </script>
+
+<!-- 新規プロジェクト -->
+<div id="modal-project" class="modal-overlay">
+    <div class="modal-card">
+        <h3>新規業務（プロジェクト）</h3>
+        <p>調査業務名または地区名を入力してください。</p>
+        <input type="text" id="new-proj-title" placeholder="例: ○○地区 猛禽類生息調査2026">
+        <textarea id="new-proj-desc" placeholder="業務概要・担当者メモ（任意）"></textarea>
+        <div class="modal-btn-row">
+            <button class="btn-cancel-gray" onclick="closeModal('modal-project')">キャンセル</button>
+            <button class="btn-confirm-blue" onclick="confirmNewProject()">作成</button>
+        </div>
+    </div>
+</div>
+
+<!-- 新規野帳 -->
+<div id="modal-fieldbook" class="modal-overlay">
+    <div class="modal-card">
+        <h3>新規野帳を追加</h3>
+        <p>野帳のタイトルと用紙サイズを設定してください。</p>
+        <input type="text" id="new-fb-title" placeholder="例: 地点A 調査1日目">
+        <div class="size-selector">
+            <p>用紙サイズ</p>
+            <label><input type="radio" name="fb-paper-size" value="A3_LANDSCAPE" checked> A3横 (420×297mm)</label>
+            <label><input type="radio" name="fb-paper-size" value="A4_PORTRAIT"> A4縦 (210×297mm)</label>
+        </div>
+        <div class="modal-btn-row">
+            <button class="btn-cancel-gray" onclick="closeModal('modal-fieldbook')">キャンセル</button>
+            <button class="btn-confirm" onclick="confirmNewFieldbook()">追加して開く</button>
+        </div>
+    </div>
+</div>
+
+<!-- トースト -->
+<div id="toast"></div>
+
 </body>
 </html>
